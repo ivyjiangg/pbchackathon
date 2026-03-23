@@ -1,0 +1,10 @@
+{
+  "name": "pbchackathon",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start:aegis": "npm run start -w aegis-proxy"
+  }
+}
