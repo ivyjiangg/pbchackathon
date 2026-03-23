@@ -1,0 +1,31 @@
+{
+  "name": "pbchackathon",
+  "version": "1.0.0",
+  "description": "��#\u0000 \u0000p\u0000b\u0000c\u0000h\u0000a\u0000c\u0000k\u0000a\u0000t\u0000h\u0000o\u0000n\u0000\r\u0000 \u0000",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivyjiangg/pbchackathon.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ivyjiangg/pbchackathon/issues"
+  },
+  "homepage": "https://github.com/ivyjiangg/pbchackathon#readme",
+  "dependencies": {
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "electron": "^41.0.3",
+    "keytar": "^7.9.0",
+    "secrets.js-grempe": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.8.1"
+  }
+}
