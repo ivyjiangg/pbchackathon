@@ -5,6 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "start:aegis": "npm run start -w aegis-proxy"
+    "start:aegis": "npm run start -w aegis-proxy",
+    "test:smoke": "npm run test:smoke -w aegis-proxy"
   }
 }

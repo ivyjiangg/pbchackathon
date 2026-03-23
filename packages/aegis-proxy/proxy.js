@@ -12,8 +12,35 @@ import bs58 from "bs58";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(__dirname, "config.json");
-const PORT = 8080;
-const HOST = "127.0.0.1";
+const PORT = (() => {
+  const n = Number.parseInt(process.env.PORT ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 8080;
+})();
+const HOST = process.env.HOST || "127.0.0.1";
+
+const DEFAULT_RPC_BY_NETWORK = {
+  devnet: "https://api.devnet.solana.com",
+  testnet: "https://api.testnet.solana.com",
+  mainnet: "https://api.mainnet-beta.solana.com",
+  "mainnet-beta": "https://api.mainnet-beta.solana.com",
+};
+
+/**
+ * RPC used by @x402/svm ExactSvmScheme. AEGIS_SOLANA_RPC_URL overrides.
+ * AEGIS_SOLANA_NETWORK defaults to devnet when unset (local dev).
+ */
+function resolveSvmRpcUrl() {
+  const custom = process.env.AEGIS_SOLANA_RPC_URL?.trim();
+  if (custom) return custom;
+  const net = (process.env.AEGIS_SOLANA_NETWORK || "devnet").trim().toLowerCase();
+  const url = DEFAULT_RPC_BY_NETWORK[net];
+  if (!url) {
+    throw new Error(
+      `Unknown AEGIS_SOLANA_NETWORK "${process.env.AEGIS_SOLANA_NETWORK}". Use devnet, mainnet-beta, testnet, or set AEGIS_SOLANA_RPC_URL.`,
+    );
+  }
+  return url;
+}
 
 const HOP_BY_HOP_REQ = new Set([
   "connection",
@@ -68,7 +95,11 @@ async function getX402HttpClient() {
   if (cachedX402HttpClient) return cachedX402HttpClient;
   const kp = await getKey();
   const svmSigner = toClientSvmSigner(await createKeyPairSignerFromBytes(kp.secretKey));
-  const core = new x402Client().register("solana:*", new ExactSvmScheme(svmSigner));
+  const rpcUrl = resolveSvmRpcUrl();
+  const core = new x402Client().register(
+    "solana:*",
+    new ExactSvmScheme(svmSigner, { rpcUrl }),
+  );
   cachedX402HttpClient = new x402HTTPClient(core);
   return cachedX402HttpClient;
 }
@@ -303,6 +334,14 @@ app.use(async (req, res) => {
   }
 });
 
+try {
+  resolveSvmRpcUrl();
+} catch (e) {
+  console.error("[Aegis Proxy] Invalid Solana RPC config:", e?.message ?? e);
+  process.exit(1);
+}
+
 app.listen(PORT, HOST, () => {
   console.log(`[Aegis Proxy] Listening on http://${HOST}:${PORT}`);
+  console.log(`[Aegis Proxy] Solana RPC: ${resolveSvmRpcUrl()}`);
 });
