@@ -22,8 +22,11 @@
   "dependencies": {
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
+    "babel-standalone": "^6.26.0",
     "electron": "^41.0.3",
     "keytar": "^7.9.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "secrets.js-grempe": "^2.0.0"
   },
   "devDependencies": {
