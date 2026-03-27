@@ -5,7 +5,8 @@
   "description": "Express HTTP proxy for x402 (HTTP 402) Solana payment challenges",
   "type": "module",
   "scripts": {
-    "start": "node proxy.js"
+    "start": "node proxy.js",
+    "test:smoke": "bash smoke-test.sh"
   },
   "dependencies": {
     "@solana/kit": "^5.1.0",
