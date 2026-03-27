@@ -9,8 +9,9 @@ Express server on **port 9090** that protects `GET /v1/macro/premium-report` wit
 
 Optional:
 
-- **PREMIUM_REPORT_PRICE** — default `"$0.50"`.
-- **PORT** (default `9090`), **HOST** (default `127.0.0.1`).
+- **AEGIS_PREMIUM_REPORT_PRICE** — default `"$0.50"` (legacy alias: `PREMIUM_REPORT_PRICE`).
+- **AEGIS_PREMIUM_API_PORT** (default `9090`) and **AEGIS_PREMIUM_API_HOST** (default `127.0.0.1`)  
+  (legacy aliases: `PORT`, `HOST`).
 
 ## Run
 

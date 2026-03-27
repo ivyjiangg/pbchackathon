@@ -9,6 +9,7 @@
     "start:premium-api": "npm run start -w aegis-premium-api",
     "demo:stack": "echo 'Terminal 1: npm run start:aegis  Terminal 2: export AEGIS_PRIVATE_KEY_BASE58=... && npm run start:premium-api  Terminal 3: curl -x http://127.0.0.1:8080 http://127.0.0.1:9090/v1/macro/premium-report'",
     "test": "node scripts/smoke-test.mjs",
-    "test:smoke": "node scripts/smoke-test.mjs"
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "proof:devnet": "node scripts/strict-devnet-proof.mjs"
   }
 }

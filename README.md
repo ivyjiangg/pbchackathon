@@ -146,6 +146,12 @@ The second command should show Aegis logging a 402 intercept and attempting paym
 
 - `npm run start:premium-api` — premium API only.
 - `npm run demo:stack` — prints suggested multi-terminal order for demos.
-- **`npm test`** — automated smoke test: starts premium API + proxy on **random ports**, checks `/health`, direct **402** + `PAYMENT-REQUIRED`, and `curl -x` through the proxy (200 with premium JSON if devnet settlement succeeds, otherwise 402 is still treated as OK for CI). Override ports with `SMOKE_PREMIUM_PORT` / `SMOKE_PROXY_PORT` if needed.
+- **`npm test`** — automated smoke test: starts premium API + proxy on **random ports**, checks `/health`, direct **402** + `PAYMENT-REQUIRED`, **guardrail 403** on blocked host, and `curl -x` through the proxy (200 with premium JSON if devnet settlement succeeds, otherwise 402 is still treated as OK for CI). Override ports with `SMOKE_PREMIUM_PORT` / `SMOKE_PROXY_PORT` if needed.
+- **`npm run proof:devnet`** — strict devnet proof runner. Requires funded wallet and writes evidence to `docs/proofs/devnet-proof.json`.
 
 The proxy listens on **`AEGIS_PROXY_PORT`** (default `8080`) and **`AEGIS_PROXY_HOST`** (default `127.0.0.1`).
+
+### Acceptance criteria split
+
+- **Demo-first pass**: `npm test` passes and shows both policy block (403) and payment path handling.
+- **Strict devnet pass**: `npm run proof:devnet` returns `200` and writes evidence per [`docs/strict-devnet-proof.md`](docs/strict-devnet-proof.md).

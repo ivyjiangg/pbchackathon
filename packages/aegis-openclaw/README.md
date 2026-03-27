@@ -8,6 +8,7 @@ Templates for running [OpenClaw](https://github.com/openclaw/openclaw) with HTTP
 | --- | --- |
 | [openclaw.json5.example](./openclaw.json5.example) | Merge into `~/.openclaw/openclaw.json`: `network.proxy` and a **narrow** `network.noProxy` list. |
 | [prompts/premium-report.md](./prompts/premium-report.md) | Demo user prompt to fetch the premium report. |
+| [prompts/policy-block.md](./prompts/policy-block.md) | Demo guardrail prompt expecting proxy policy denial (403). |
 
 ## Merge steps
 
@@ -29,6 +30,21 @@ See [Environment](https://docs.openclaw.ai/help/environment) for precedence.
 
 ## Start order for demos
 
+Check CLI install first:
+
+```bash
+openclaw --version
+```
+
+If that fails, install OpenClaw CLI before running the flow.
+
 1. `npm run start:aegis` (repo root)
 2. `export AEGIS_PRIVATE_KEY_BASE58=...` and `npm run start:premium-api`
 3. `openclaw gateway run` (or your team’s documented command)
+
+## E2E runbook (success + guardrail)
+
+1. Merge [`openclaw.json5.example`](./openclaw.json5.example) into `~/.openclaw/openclaw.json`.
+2. Start proxy + premium API using the order above.
+3. Run prompt [`prompts/premium-report.md`](./prompts/premium-report.md) and expect premium JSON (or 402 if wallet is unfunded).
+4. Run prompt [`prompts/policy-block.md`](./prompts/policy-block.md) and expect 403 policy denial.

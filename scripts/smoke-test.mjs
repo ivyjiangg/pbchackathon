@@ -51,7 +51,11 @@ async function main() {
   const procs = [];
   try {
     procs.push(
-      spawnNode(premiumEntry, { PORT: String(premiumPort), HOST: "127.0.0.1" }, "premium"),
+      spawnNode(
+        premiumEntry,
+        { AEGIS_PREMIUM_API_PORT: String(premiumPort), AEGIS_PREMIUM_API_HOST: "127.0.0.1" },
+        "premium",
+      ),
     );
     procs.push(
       spawnNode(proxyEntry, { AEGIS_PROXY_PORT: String(proxyPort), AEGIS_PROXY_HOST: "127.0.0.1" }, "proxy"),
@@ -60,7 +64,7 @@ async function main() {
 
     const base = `http://127.0.0.1:${premiumPort}`;
 
-    // 1) Mock health
+    // 1) Premium API health
     let res = await fetch(`${base}/health`);
     if (!res.ok) throw new Error(`Expected /health 200, got ${res.status}`);
     const health = await res.json();
@@ -74,7 +78,16 @@ async function main() {
     const pr = res.headers.get("PAYMENT-REQUIRED") || res.headers.get("payment-required");
     if (!pr) throw new Error("Direct premium: missing PAYMENT-REQUIRED header");
 
-    // 3) Through Aegis proxy (absolute-form URL); must not be 403/502
+    // 3) Deterministic guardrail: blocked host should return 403 before forwarding
+    const blockedCode = execSync(
+      `curl -sS -o /dev/null -w "%{http_code}" -H "x-aegis-target: https://blocked.invalid/" http://127.0.0.1:${proxyPort}/`,
+      { encoding: "utf8" },
+    ).trim();
+    if (blockedCode !== "403") {
+      throw new Error(`Guardrail path: expected 403, got ${blockedCode}`);
+    }
+
+    // 4) Through Aegis proxy (absolute-form URL); must not be 403/502
     const bodyPath = join(tmpdir(), `aegis-smoke-body-${Date.now()}.txt`);
     const curlOut = execSync(
       `curl -sS -o "${bodyPath}" -w "%{http_code}" -x http://127.0.0.1:${proxyPort} ${base}/v1/macro/premium-report`,

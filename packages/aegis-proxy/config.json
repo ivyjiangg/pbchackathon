@@ -1,6 +1,10 @@
 {
-  "whitelist": ["example.com", "127.0.0.1", "localhost"],
+  "whitelist": [
+    "example.com",
+    "127.0.0.1",
+    "localhost"
+  ],
   "daily_budget_lamports": "1000000000",
-  "spent_today": "0",
-  "last_reset_date": "2026-03-22"
+  "spent_today": "1000000",
+  "last_reset_date": "2026-03-27"
 }

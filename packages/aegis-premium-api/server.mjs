@@ -8,8 +8,12 @@ import bs58 from "bs58";
 /** Devnet CAIP-2 id (matches @x402/svm + x402 facilitator `supported` for SVM / exact). */
 const SOLANA_DEVNET = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
 
-const PORT = Number(process.env.PORT || 9090);
-const HOST = process.env.HOST || "127.0.0.1";
+const PORT = (() => {
+  const envPort = process.env.AEGIS_PREMIUM_API_PORT ?? process.env.PORT ?? "";
+  const n = Number.parseInt(envPort, 10);
+  return Number.isFinite(n) && n > 0 ? n : 9090;
+})();
+const HOST = process.env.AEGIS_PREMIUM_API_HOST || process.env.HOST || "127.0.0.1";
 
 /**
  * Recipient for USDC (exact scheme). Defaults to the public key of AEGIS_PRIVATE_KEY_BASE58
@@ -26,7 +30,8 @@ function resolvePayTo() {
   );
 }
 
-const price = process.env.PREMIUM_REPORT_PRICE || "$0.50";
+const price =
+  process.env.AEGIS_PREMIUM_REPORT_PRICE || process.env.PREMIUM_REPORT_PRICE || "$0.50";
 
 const routes = {
   "GET /v1/macro/premium-report": {
