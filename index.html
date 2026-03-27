@@ -409,7 +409,7 @@
   <script src="node_modules/babel-standalone/babel.js"></script>
 
   <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
     const ipc = window._ipc;
 
     // ── ICONS (dot-and-line SVG) ───────────────────────────────────────────────
@@ -508,9 +508,87 @@
       </div>
     );
 
+    // ── LOCAL STACK (backend) ─────────────────────────────────────────────────
+    const defaultStackPorts = { proxy: 8080, premium: 9090 };
+    const LocalStackCard = ({
+      stackPorts,
+      setStackPorts,
+      stackStatus,
+      stackLogs,
+      healthPremium,
+      healthProxy,
+      scriptOut,
+      scriptBusy,
+      proofJson,
+      onStart,
+      onStop,
+      onClearLogs,
+      onRunSmoke,
+      onRunProof,
+    }) => (
+      <div className="card" style={{marginBottom:'16px'}}>
+        <div className="sec-hdr">
+          <span className="sec-title">Local stack (backend)</span>
+          <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+            <button className="btn btn-outline" onClick={onClearLogs} type="button">Clear logs</button>
+            <button className="btn btn-outline" onClick={onStop} disabled={!stackStatus || (!stackStatus.proxyRunning && !stackStatus.premiumRunning)} type="button">Stop</button>
+            <button className="btn btn-primary" onClick={onStart} disabled={!!(stackStatus && stackStatus.proxyRunning)} type="button">Start</button>
+          </div>
+        </div>
+        <p style={{fontSize:'12px', color:'var(--muted)', marginBottom:'14px', lineHeight:1.5}}>
+          Runs premium API and the Aegis x402 proxy. Put <span className="mono">AEGIS_PRIVATE_KEY_BASE58</span> (or <span className="mono">X402_PAY_TO</span>) in a <span className="mono">.env</span> file at the repo root — it is loaded when the app starts. You can also export vars in your shell before <span className="mono">npm start</span>.
+          Proxy policy file: <span className="mono">~/.aegis/proxy-policy.json</span> — URL whitelist is synced when you save Policy.
+        </p>
+        <div className="grid-2" style={{marginBottom:'12px'}}>
+          <div className="form-group">
+            <label className="form-label">Proxy port</label>
+            <input className="form-input" type="number" min="1" max="65535"
+              value={stackPorts.proxy}
+              onChange={e => setStackPorts(p => ({ ...p, proxy: Number(e.target.value) || 8080 }))}
+              disabled={!!(stackStatus && stackStatus.proxyRunning)}/>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Premium API port</label>
+            <input className="form-input" type="number" min="1" max="65535"
+              value={stackPorts.premium}
+              onChange={e => setStackPorts(p => ({ ...p, premium: Number(e.target.value) || 9090 }))}
+              disabled={!!(stackStatus && stackStatus.proxyRunning)}/>
+          </div>
+        </div>
+        <div style={{fontSize:'12px', fontFamily:'var(--mono)', color:'var(--muted)', marginBottom:'10px'}}>
+          {(stackStatus && stackStatus.proxyRunning) ? <span style={{color:'var(--green)'}}>● Proxy running</span> : <span>○ Proxy stopped</span>}
+          <span style={{margin:'0 12px'}}>|</span>
+          {(stackStatus && stackStatus.premiumRunning) ? <span style={{color:'var(--green)'}}>● Premium API running</span> : <span>○ Premium stopped</span>}
+        </div>
+        <div style={{fontSize:'12px', fontFamily:'var(--mono)', color:'var(--muted)', marginBottom:'12px'}}>
+          Health — Premium: {(healthPremium && healthPremium.ok) ? 'ok' : '—'} · Proxy: {(healthProxy && healthProxy.ok) ? 'ok' : '—'}
+        </div>
+        <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Process logs</span></div>
+        <pre style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px', fontSize:'11px', maxHeight:'160px', overflow:'auto', whiteSpace:'pre-wrap', wordBreak:'break-all', color:'var(--muted)'}}>
+          {(stackLogs && stackLogs.length) ? stackLogs.map(l => `[${l.source}] ${l.line}`).join('\n') : 'No logs yet.'}
+        </pre>
+        <div className="sec-hdr" style={{marginTop:'16px', marginBottom:'8px'}}><span className="sec-title">Checks</span></div>
+        <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'10px'}}>
+          <button className="btn btn-outline" onClick={onRunSmoke} disabled={scriptBusy} type="button">{scriptBusy ? 'Running…' : 'Run smoke test'}</button>
+          <button className="btn btn-outline" onClick={onRunProof} disabled={scriptBusy} type="button">Run strict devnet proof</button>
+        </div>
+        {scriptOut ? (
+          <pre style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px', fontSize:'11px', maxHeight:'160px', overflow:'auto', whiteSpace:'pre-wrap', color:'var(--muted)'}}>
+            {scriptOut}
+          </pre>
+        ) : null}
+        {proofJson ? (
+          <div className="toast-ok" style={{marginTop:'10px', fontSize:'11px', fontFamily:'var(--mono)'}}>
+            Proof file updated — HTTP {String(proofJson.status || '')} · {proofJson.notes || ''}
+          </div>
+        ) : null}
+      </div>
+    );
+
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
-    const OverviewTab = ({ stats, walletStatus, pendingCount }) => (
+    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack }) => (
       <div>
+        {localStack}
         {pendingCount > 0 && (
           <div className="alert-banner">
             <span>⚠</span>
@@ -750,7 +828,7 @@
             <div className="form-group">
               <label className="form-label">Whitelisted URLs</label>
               {T('whitelistedURLs','localhost:9090\napi.trusted.com')}
-              <p className="form-hint">One per line. Requests to unlisted URLs are blocked.</p>
+              <p className="form-hint">One per line. Hostnames are synced to the Aegis proxy whitelist (~/.aegis/proxy-policy.json). Ports/paths are stripped (e.g. localhost:9090 → localhost).</p>
             </div>
             <div className="form-group">
               <label className="form-label">Blacklisted URLs</label>
@@ -981,6 +1059,128 @@
       const [stats, setStats]           = useState(null);
       const [activity, setActivity]     = useState([]);
       const [pending, setPending]       = useState([]);
+      const [stackPorts, setStackPorts] = useState(() => {
+        try {
+          const s = localStorage.getItem('aegis-stack-ports');
+          if (s) return { ...defaultStackPorts, ...JSON.parse(s) };
+        } catch (_) {}
+        return defaultStackPorts;
+      });
+      const [stackStatus, setStackStatus] = useState(null);
+      const [stackLogs, setStackLogs]   = useState([]);
+      const [healthPremium, setHealthPremium] = useState(null);
+      const [healthProxy, setHealthProxy] = useState(null);
+      const [scriptOut, setScriptOut]   = useState('');
+      const [scriptBusy, setScriptBusy] = useState(false);
+      const [proofJson, setProofJson]   = useState(null);
+      const scriptPollRef = useRef(null);
+
+      useEffect(() => {
+        try { localStorage.setItem('aegis-stack-ports', JSON.stringify(stackPorts)); } catch (_) {}
+      }, [stackPorts]);
+
+      useEffect(() => {
+        const t = setInterval(async () => {
+          try {
+            const st = await ipc.invoke('aegis-stack-status');
+            setStackStatus(st);
+            const logs = await ipc.invoke('aegis-stack-logs');
+            setStackLogs(logs || []);
+          } catch (_) {}
+        }, 1500);
+        return () => clearInterval(t);
+      }, []);
+
+      useEffect(() => {
+        if (!stackStatus || !stackStatus.proxyRunning) {
+          setHealthPremium(null);
+          setHealthProxy(null);
+          return;
+        }
+        const host = stackStatus.host || '127.0.0.1';
+        const pp = stackStatus.premiumPort;
+        const pr = stackStatus.proxyPort;
+        const poll = async () => {
+          try {
+            const r = await fetch(`http://${host}:${pp}/health`);
+            setHealthPremium(r.ok ? await r.json() : null);
+          } catch (_) { setHealthPremium(null); }
+          try {
+            const r = await fetch(`http://${host}:${pr}/health`);
+            setHealthProxy(r.ok ? await r.json() : null);
+          } catch (_) { setHealthProxy(null); }
+        };
+        poll();
+        const iv = setInterval(poll, 2000);
+        return () => clearInterval(iv);
+      }, [stackStatus && stackStatus.proxyRunning, stackStatus && stackStatus.premiumPort, stackStatus && stackStatus.proxyPort, stackStatus && stackStatus.host]);
+
+      const handleStackStart = async () => {
+        await ipc.invoke('aegis-stack-clear-logs');
+        const r = await ipc.invoke('aegis-stack-start', { proxyPort: stackPorts.proxy, premiumPort: stackPorts.premium });
+        if (!r.ok) alert(r.error || 'Could not start stack');
+      };
+      const handleStackStop = async () => { await ipc.invoke('aegis-stack-stop'); };
+      const handleClearStackLogs = async () => { await ipc.invoke('aegis-stack-clear-logs'); };
+
+      const runSmoke = async () => {
+        if (scriptPollRef.current) { clearInterval(scriptPollRef.current); scriptPollRef.current = null; }
+        setScriptBusy(true);
+        setScriptOut('');
+        setProofJson(null);
+        const r = await ipc.invoke('aegis-script-start-smoke');
+        if (!r.ok) { alert(r.error || 'Could not start smoke test'); setScriptBusy(false); return; }
+        scriptPollRef.current = setInterval(async () => {
+          const st = await ipc.invoke('aegis-script-status');
+          setScriptOut(st.output || '');
+          if (!st.running && st.lastCode !== null && st.lastCode !== undefined) {
+            clearInterval(scriptPollRef.current);
+            scriptPollRef.current = null;
+            setScriptBusy(false);
+          }
+        }, 150);
+      };
+
+      const runProof = async () => {
+        if (scriptPollRef.current) { clearInterval(scriptPollRef.current); scriptPollRef.current = null; }
+        setScriptBusy(true);
+        setScriptOut('');
+        setProofJson(null);
+        const r = await ipc.invoke('aegis-script-start-proof');
+        if (!r.ok) { alert(r.error || 'Could not start proof'); setScriptBusy(false); return; }
+        scriptPollRef.current = setInterval(async () => {
+          const st = await ipc.invoke('aegis-script-status');
+          setScriptOut(st.output || '');
+          if (!st.running && st.lastCode !== null && st.lastCode !== undefined) {
+            clearInterval(scriptPollRef.current);
+            scriptPollRef.current = null;
+            setScriptBusy(false);
+            if (st.lastCode === 0) {
+              const pj = await ipc.invoke('aegis-read-proof');
+              setProofJson(pj);
+            }
+          }
+        }, 150);
+      };
+
+      const localStackEl = (
+        <LocalStackCard
+          stackPorts={stackPorts}
+          setStackPorts={setStackPorts}
+          stackStatus={stackStatus}
+          stackLogs={stackLogs}
+          healthPremium={healthPremium}
+          healthProxy={healthProxy}
+          scriptOut={scriptOut}
+          scriptBusy={scriptBusy}
+          proofJson={proofJson}
+          onStart={handleStackStart}
+          onStop={handleStackStop}
+          onClearLogs={handleClearStackLogs}
+          onRunSmoke={runSmoke}
+          onRunProof={runProof}
+        />
+      );
 
       const refresh = useCallback(async () => {
         try {
@@ -1070,7 +1270,7 @@
             </div>
 
             <div className="content">
-              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length}/>}
+              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl}/>}
               {tab==='activity' && <ActivityTab activity={activity} pending={pending} onApprove={handleApprove} onDeny={handleDeny}/>}
               {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy}/>}
               {tab==='wallet'   && <WalletTab   walletStatus={walletStatus} onProvision={handleProvision}/>}

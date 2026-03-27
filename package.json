@@ -18,6 +18,7 @@
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "babel-standalone": "^6.26.0",
+    "dotenv": "^16.6.1",
     "electron": "^41.0.3",
     "keytar": "^7.9.0",
     "react": "^19.2.4",

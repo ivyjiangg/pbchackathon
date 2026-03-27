@@ -1,11 +1,11 @@
 {
-  "startedAt": "2026-03-27T03:01:49.119Z",
-  "finishedAt": "2026-03-27T03:01:58.252Z",
+  "startedAt": "2026-03-27T23:36:15.769Z",
+  "finishedAt": "2026-03-27T23:36:24.401Z",
   "proxyPort": 8080,
   "premiumPort": 9090,
   "targetUrl": "http://127.0.0.1:9090/v1/macro/premium-report",
   "status": 200,
-  "paymentResponseHeader": "eyJzdWNjZXNzIjp0cnVlLCJ0cmFuc2FjdGlvbiI6IkJKeGR5UFV2U1JVandNeXZSR3hkV0ZIQmd2dGhmQjkzNzdWZkU4OFZwaUJwQzgydnJBREx2emJnWjJGcFRNVk1MZDFUQVlSc2RlYVlEQjE0WWVSQ1NEcCIsIm5ldHdvcmsiOiJzb2xhbmE6RXRXVFJBQlphWXE2aU1mZVlLb3VSdTE2NlZVMnhxYTEiLCJwYXllciI6IkRhR3pISFZpc3AyZzVVdEZQZTh6eHpLbllkZnFoaFJqZGo1c0JwOUdENnoyIn0=",
+  "paymentResponseHeader": "eyJzdWNjZXNzIjp0cnVlLCJ0cmFuc2FjdGlvbiI6IjVLU3NOWEQ3cnhKTFNtOXRqd1FFSHVUS3VyZ3FWcGdKZ05mYTNIY1lGVWZxcjNYRGJUdjQ3OXlwTVRjc3E2bkZXWDhpd3B6eEVDcVk2WlV3YXZvVk5HRzEiLCJuZXR3b3JrIjoic29sYW5hOkV0V1RSQUJaYVlxNmlNZmVZS291UnUxNjZWVTJ4cWExIiwicGF5ZXIiOiJEYUd6SEhWaXNwMmc1VXRGUGU4enh6S25ZZGZxaGhSamRqNXNCcDlHRDZ6MiJ9",
   "bodyPreview": "{\"title\":\"Premium macroeconomic outlook\",\"period\":\"2026-Q1\",\"summary\":\"Report snapshot: growth stable, inflation cooling in demo scenario.\",\"source\":\"aegis-premium-api\"}",
   "notes": "Success path achieved."
 }

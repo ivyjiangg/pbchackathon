@@ -2,7 +2,8 @@ import express from "express";
 import axios from "axios";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { homedir } from "os";
+import { dirname, join, isAbsolute } from "path";
 import { Keypair } from "@solana/web3.js";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
 import { x402Client } from "@x402/core/client";
@@ -11,7 +12,19 @@ import { ExactSvmScheme, toClientSvmSigner } from "@x402/svm";
 import bs58 from "bs58";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(__dirname, "config.json");
+
+function resolveConfigPath() {
+  const raw = process.env.AEGIS_PROXY_CONFIG_PATH?.trim();
+  if (raw) {
+    if (raw.startsWith("~/")) {
+      return join(homedir(), raw.slice(2));
+    }
+    return isAbsolute(raw) ? raw : join(__dirname, raw);
+  }
+  return join(__dirname, "config.json");
+}
+
+const CONFIG_PATH = resolveConfigPath();
 const PORT = (() => {
   const envPort = process.env.AEGIS_PROXY_PORT ?? process.env.PORT ?? "";
   const n = Number.parseInt(envPort, 10);
@@ -245,6 +258,10 @@ async function forwardOnce(targetUrl, req) {
 
 const app = express();
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, service: "aegis-proxy" });
+});
+
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
     req.bodyBuffer = Buffer.alloc(0);
@@ -354,4 +371,5 @@ try {
 app.listen(PORT, HOST, () => {
   console.log(`[Aegis Proxy] Listening on http://${HOST}:${PORT}`);
   console.log(`[Aegis Proxy] Solana RPC: ${resolveSvmRpcUrl()}`);
+  console.log(`[Aegis Proxy] Policy file: ${CONFIG_PATH}`);
 });

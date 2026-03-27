@@ -15,6 +15,8 @@ const ACTIVITY_PATH = path.join(AEGIS_DIR, 'activity.json');
 const PENDING_PATH  = path.join(AEGIS_DIR, 'pending.json');
 const SPEND_PATH    = path.join(AEGIS_DIR, 'spend.json');
 const RECOVERY_PATH = path.join(AEGIS_DIR, 'share3-RECOVERY.txt');
+const PROXY_POLICY_PATH = path.join(AEGIS_DIR, 'proxy-policy.json');
+const PACKAGE_PROXY_CONFIG = path.join(__dirname, 'packages', 'aegis-proxy', 'config.json');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ensureDir() {
@@ -29,6 +31,44 @@ function readJSON(filePath, fallback) {
 function writeJSON(filePath, data) {
   ensureDir();
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
+
+/** Map UI URL lines to hostnames for aegis-proxy whitelist (see packages/aegis-proxy/proxy.js). */
+function parseHostnameFromLine(line) {
+  const s = String(line || '').trim();
+  if (!s) return null;
+  try {
+    const u = new URL(s.includes('://') ? s : `http://${s}`);
+    return u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Writes ~/.aegis/proxy-policy.json whitelist from Policy tab (hostname-only). */
+function syncProxyWhitelistFromPolicy(policy) {
+  const raw = policy.whitelistedURLs || [];
+  const lines = Array.isArray(raw) ? raw : [String(raw)];
+  const hosts = new Set();
+  for (const entry of lines) {
+    for (const part of String(entry).split(/[\n,]/)) {
+      const h = parseHostnameFromLine(part.trim());
+      if (h) hosts.add(h);
+    }
+  }
+  const list = [...hosts].sort();
+
+  let existing = {};
+  if (fs.existsSync(PROXY_POLICY_PATH)) {
+    try {
+      existing = JSON.parse(fs.readFileSync(PROXY_POLICY_PATH, 'utf8'));
+    } catch (_) {}
+  } else if (fs.existsSync(PACKAGE_PROXY_CONFIG)) {
+    existing = JSON.parse(fs.readFileSync(PACKAGE_PROXY_CONFIG, 'utf8'));
+  }
+  existing.whitelist = list;
+  ensureDir();
+  fs.writeFileSync(PROXY_POLICY_PATH, JSON.stringify(existing, null, 2));
 }
 
 function buildDefaultSpend() {
@@ -126,6 +166,7 @@ async function provisionWallet(policy) {
   // Write config
   const config = buildConfig(policy, keypair.publicKey.toBase58());
   writeJSON(CONFIG_PATH, config);
+  syncProxyWhitelistFromPolicy(policy);
 
   // Initialize spend tracker
   writeJSON(SPEND_PATH, buildDefaultSpend());
@@ -140,6 +181,7 @@ function savePolicy(policy) {
   const publicKey = existing.walletPublicKey || '';
   const config = buildConfig(policy, publicKey);
   writeJSON(CONFIG_PATH, config);
+  syncProxyWhitelistFromPolicy(policy);
   return { success: true };
 }
 
