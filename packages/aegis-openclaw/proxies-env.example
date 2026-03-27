@@ -1,0 +1,6 @@
+# Optional: if OpenClaw does not honor network.proxy in config, set these in the shell
+# before starting the gateway (see https://docs.openclaw.ai/help/environment).
+HTTP_PROXY=http://127.0.0.1:8080
+HTTPS_PROXY=http://127.0.0.1:8080
+# List model/API hosts that must NOT go through Aegis. Do not add 127.0.0.1 as a whole.
+NO_PROXY=api.anthropic.com,api.openai.com,127.0.0.1:18789

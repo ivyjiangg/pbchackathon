@@ -1,0 +1,16 @@
+// Merge into ~/.openclaw/openclaw.json — only the `network` block is Aegis-specific.
+// Adjust `noProxy` to match your model providers; expand the list as needed.
+{
+  network: {
+    // Route outbound HTTP(S) through Aegis so 402/x402 can be handled.
+    proxy: "http://127.0.0.1:8080",
+    // Direct connections for LLM APIs (do NOT blanket-block all localhost or the premium API on :9090 won't go through the proxy).
+    noProxy: [
+      "api.anthropic.com",
+      "api.openai.com",
+      "openrouter.ai",
+      "api.groq.com",
+      "127.0.0.1:18789",
+    ],
+  },
+}

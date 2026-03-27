@@ -1,0 +1,6 @@
+{
+  "name": "aegis-openclaw",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenClaw config snippets and demo prompts for routing through Aegis"
+}

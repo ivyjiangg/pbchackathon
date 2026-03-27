@@ -12,8 +12,8 @@ import bs58 from "bs58";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = join(__dirname, "config.json");
-const PORT = 8080;
-const HOST = "127.0.0.1";
+const PORT = Number(process.env.AEGIS_PROXY_PORT || 8080);
+const HOST = process.env.AEGIS_PROXY_HOST || "127.0.0.1";
 
 const HOP_BY_HOP_REQ = new Set([
   "connection",
@@ -79,6 +79,15 @@ function resolveTargetUrl(req) {
     const s = String(rawHeader).trim();
     try {
       return new URL(s).href;
+    } catch {
+      return null;
+    }
+  }
+  // HTTP proxy clients send absolute-form request-target (e.g. GET http://host/path)
+  const rawUrl = req.url || "";
+  if (/^https?:\/\//i.test(rawUrl)) {
+    try {
+      return new URL(rawUrl).href;
     } catch {
       return null;
     }
