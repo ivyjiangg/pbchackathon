@@ -586,54 +586,10 @@
       </div>
     );
 
-    // ── DEMO (copy-paste curls) ───────────────────────────────────────────────
-    const DemoFlowCard = ({ stackPorts, stackStatus }) => {
-      const [copied, setCopied] = useState(null);
-      const flash = (id) => { setCopied(id); setTimeout(() => setCopied(null), 1600); };
-      const clip = (id, text) => {
-        try {
-          require('electron').clipboard.writeText(text);
-          flash(id);
-        } catch (e) { console.error(e); }
-      };
-      const h = (stackStatus && stackStatus.host) || '127.0.0.1';
-      const pxy = (stackStatus && stackStatus.proxyPort) || (stackPorts && stackPorts.proxy) || 8080;
-      const prm = (stackStatus && stackStatus.premiumPort) || (stackPorts && stackPorts.premium) || 9090;
-      const nd = '/dev/null';
-      const rows = [
-        { id: 'b', label: '1. Blocked host (expect 403)', cmd: `curl -sS -o ${nd} -w "%{http_code}" -H "x-aegis-target: https://blocked.invalid/" http://${h}:${pxy}/` },
-        { id: 'f', label: '2. Allowed /health (expect 200)', cmd: `curl -sS -o ${nd} -w "%{http_code}" -H "x-aegis-target: http://${h}:${prm}/health" http://${h}:${pxy}/` },
-        { id: 'x', label: '3. Premium x402 via proxy', cmd: `curl -sS -w "%{http_code}" -x http://${h}:${pxy}/ http://${h}:${prm}/v1/macro/premium-report` },
-        { id: 'n', label: '4. Full script (repo root terminal)', cmd: `AEGIS_PROXY_HOST=${h} AEGIS_PROXY_PORT=${pxy} AEGIS_PREMIUM_PORT=${prm} npm run demo:agent-flow` },
-      ];
-      return (
-        <div className="card" style={{marginBottom:'16px'}}>
-          <div className="sec-hdr"><span className="sec-title">Demo — terminal commands</span></div>
-          <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.55, marginBottom:'12px'}}>
-            Start the stack above, then run these from the <span className="mono">pbchackathon</span> repo (Windows: use <span className="mono">NUL</span> instead of <span className="mono">/dev/null</span>). On HTTP 402 the proxy adds x402 <span className="mono">PAYMENT-SIGNATURE</span> (not arbitrary API keys). For spend caps, lower daily/per-tx on Policy and repeat step 3 — watch Activity.
-          </p>
-          <p style={{fontSize:'11px', color:'var(--dim)', fontFamily:'var(--mono)', marginBottom:'14px'}}>host={h} proxy={pxy} premium={prm}</p>
-          {rows.map(({ id, label, cmd }) => (
-            <div key={id} style={{marginBottom:'12px'}}>
-              <div style={{fontSize:'11px', color:'var(--dim)', marginBottom:'4px'}}>{label}</div>
-              <div style={{display:'flex', gap:'8px', alignItems:'flex-start', flexWrap:'wrap'}}>
-                <pre style={{flex:1, minWidth:'200px', background:'#161626', border:'1px solid var(--border)', borderRadius:'6px', padding:'8px', fontSize:'10px', whiteSpace:'pre-wrap', wordBreak:'break-all', color:'var(--muted)', margin:0}}>{cmd}</pre>
-                <button type="button" className="btn btn-outline" style={{flexShrink:0}} onClick={() => clip(id, cmd)}>{copied === id ? 'Copied' : 'Copy'}</button>
-              </div>
-            </div>
-          ))}
-          <p style={{fontSize:'11px', color:'var(--dim)', marginTop:'8px', lineHeight:1.5}}>
-            Core demo: x402 through the proxy (steps above). Optional external agent env: <span className="mono">packages/aegis-openclaw/proxies-env.example</span> — <span className="mono">docs/demo-agent.md</span>.
-          </p>
-        </div>
-      );
-    };
-
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
-    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack, proxyOverview, stackPorts, stackStatus }) => (
+    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack, proxyOverview }) => (
       <div>
         {localStack}
-        <DemoFlowCard stackPorts={stackPorts} stackStatus={stackStatus} />
         {proxyOverview && (
           <div className="card" style={{marginBottom:'16px'}}>
             <div className="sec-hdr"><span className="sec-title">Proxy activity (today)</span></div>
@@ -656,12 +612,12 @@
           <div className="card">
             <div className="stat-label">Spent Today</div>
             <div className="stat-value">${stats ? stats.spentTodayUSDC.toFixed(2) : '0.00'}</div>
-            <div className="stat-sub">of ${stats ? stats.dailyBudgetUSDC.toFixed(2) : '—'} limit</div>
+            <div className="stat-sub">of ${stats ? stats.dailyBudgetUSDC.toFixed(2) : '—'} limit (HITL + x402)</div>
           </div>
           <div className="card">
             <div className="stat-label">Transactions</div>
             <div className="stat-value">{stats ? stats.transactionCount : 0}</div>
-            <div className="stat-sub">total approved</div>
+            <div className="stat-sub">HITL approved + x402 paid (lifetime)</div>
           </div>
           <div className="card">
             <div className="stat-label">Daily Remaining</div>
@@ -686,7 +642,7 @@
         <div className="card">
           <div className="sec-hdr"><span className="sec-title">Budget Utilization (wallet / HITL)</span></div>
           <p style={{fontSize:'11px', color:'var(--dim)', marginBottom:'12px', lineHeight:1.5}}>
-            Daily and per-tx limits on the Policy tab also sync to the <span className="mono">proxy</span> for x402 payments. Weekly/monthly below are dashboard-only.
+            Bars combine <strong>HITL</strong> spend (this app) with <strong>x402</strong> totals from the proxy log (rolling 7d / 30d for weekly/monthly). Daily matches <span className="mono">~/.aegis/proxy-policy.json</span> spend caps.
           </p>
           {stats
             ? <div>
@@ -719,6 +675,21 @@
         catch (_) { return '—'; }
       };
 
+      /** proxy-activity.jsonl: amount_micro is USDC × 1e6 for paid_success (same units as on-chain x402 amount). */
+      const proxyPaidAmountUsdc = (ev) => {
+        const o = ev.outcome || '';
+        if (o !== 'paid_success') return 0;
+        const raw = ev.amount_micro;
+        if (raw != null && String(raw).length > 0) {
+          try {
+            return Number(BigInt(String(raw))) / 1e6;
+          } catch (_) {
+            return 0;
+          }
+        }
+        return 0.5;
+      };
+
       const proxyRows = (proxyActivity || []).map((ev, i) => {
         const o = ev.outcome || '';
         let st = 'BLOCKED';
@@ -729,7 +700,7 @@
           _proxy: true,
           status: st,
           url: ev.url || ev.hostname || '—',
-          amount: 0,
+          amount: proxyPaidAmountUsdc(ev),
           timestamp: ev.ts,
           _detail: o
         };
@@ -816,6 +787,7 @@
       const toArr  = s => s.split('\n').map(x => x.trim()).filter(Boolean);
 
       const [probeMsg, setProbeMsg] = useState(null);
+      const [formDirty, setFormDirty] = useState(false);
       const [f, setF] = useState({
         dailyBudget:'2.00', weeklyBudget:'10.00', monthlyBudget:'50.00',
         perTxLimit:'0.50', autoApproveThreshold:'1.00',
@@ -829,7 +801,7 @@
       const [saved, setSaved]   = useState(false);
 
       useEffect(() => {
-        if (!config) return;
+        if (!config || formDirty) return;
         setF({
           dailyBudget:          String(config.dailyBudgetUSDC          || 2),
           weeklyBudget:         String(config.weeklyBudgetUSDC         || 10),
@@ -848,9 +820,12 @@
           forbiddenActions:     arrStr(config.forbiddenActions),
           priorityInstructions: config.priorityInstructions || ''
         });
-      }, [config]);
+      }, [config, formDirty]);
 
-      const set = k => e => setF(p => ({...p, [k]: e.target.value}));
+      const bind = k => e => {
+        setFormDirty(true);
+        setF(p => ({...p, [k]: e.target.value}));
+      };
 
       const save = async () => {
         setSaving(true);
@@ -872,16 +847,17 @@
           forbiddenActions:     toArr(f.forbiddenActions),
           priorityInstructions: f.priorityInstructions
         });
+        setFormDirty(false);
         setSaving(false); setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       };
 
       const I = (key, type='text', placeholder='') => (
         <input className="form-input" type={type} step={type==='number'?'0.01':undefined}
-          value={f[key]} onChange={set(key)} placeholder={placeholder}/>
+          value={f[key]} onChange={bind(key)} placeholder={placeholder} autoComplete="off"/>
       );
       const T = (key, placeholder='') => (
-        <textarea className="form-textarea" value={f[key]} onChange={set(key)} placeholder={placeholder}/>
+        <textarea className="form-textarea" value={f[key]} onChange={bind(key)} placeholder={placeholder} autoComplete="off" spellCheck="false"/>
       );
 
       const runProbe = async () => {
@@ -910,6 +886,11 @@
               {saving ? <span className="spinner"/> : saved ? '✓ Saved' : 'Save Policy'}
             </button>
           </div>
+          <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.55, marginBottom:'16px'}}>
+            <strong style={{color:'var(--text)'}}>HTTP proxy (stack running):</strong> URL allow/block lists, keyword hostname blocklist, daily + per-tx caps, and Solana <span className="mono">payTo</span> allow/deny — written to <span className="mono">~/.aegis/proxy-policy.json</span>.
+            <br/>
+            <strong style={{color:'var(--text)'}}>This app only:</strong> weekly/monthly budgets, auto-approve threshold (for future HITL automation), program IDs, token mints, and prompt text — saved in <span className="mono">~/.aegis/config.json</span> for agents / tooling.
+          </p>
 
           {proxyPolicy && proxyPolicy.exists === false && (
             <div style={{border:'1px dashed var(--border)', borderRadius:'8px', padding:'12px', marginBottom:'16px'}}>
@@ -920,12 +901,14 @@
             <div style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'14px', marginBottom:'16px'}}>
               <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Effective proxy policy (on disk)</span></div>
               <p style={{fontSize:'11px', color:'var(--dim)', lineHeight:1.5, marginBottom:'10px'}}>
-                When an upstream returns HTTP 402, the proxy signs x402 payment requirements and retries with <span className="mono">PAYMENT-SIGNATURE</span> — not generic third-party API keys.
+                After HTTP 402, the proxy signs x402 requirements and retries with <span className="mono">PAYMENT-SIGNATURE</span>.
               </p>
               <p style={{fontSize:'10px', color:'var(--dim)', fontFamily:'var(--mono)', wordBreak:'break-all', marginBottom:'10px'}}>{proxyPolicy.path}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Whitelist</strong>: {(proxyPolicy.whitelist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Blacklist</strong>: {(proxyPolicy.blacklist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Keywords</strong>: {(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>URL whitelist</strong>: {(proxyPolicy.whitelist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>URL blacklist</strong>: {(proxyPolicy.blacklist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Hostname keywords</strong>: {(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>payTo allowlist</strong> (empty = any): {(proxyPolicy.recipient_allowlist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>payTo denylist</strong>: {(proxyPolicy.recipient_denylist || []).join(', ') || '—'}</p>
               <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Proxy daily cap (micro-USDC)</strong>: {String(proxyPolicy.daily_budget_micro_usdc || '')}</p>
               <div style={{marginTop:'12px', display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center'}}>
                 <button type="button" className="btn btn-outline" onClick={runProbe}>Probe non-whitelisted host</button>
@@ -934,9 +917,9 @@
             </div>
           )}
 
-          <p className="form-section">Spend Controls</p>
+          <p className="form-section">Spend &amp; x402 caps (proxy)</p>
           <p className="form-hint" style={{marginBottom:'14px'}}>
-            Daily and per-tx limits sync to the Aegis proxy for x402 payments (micro-USDC, same units as on-chain payment amounts). Weekly/monthly below are tracked in this dashboard only.
+            Daily and per-tx limits sync to the proxy for x402 (micro-USDC). Weekly/monthly are tracked in this app for Overview bars — restart stack after Save if caps changed.
           </p>
           <div className="grid-3">
             <div className="form-group"><label className="form-label">Daily Budget (USDC)</label>{I('dailyBudget','number')}</div>
@@ -948,11 +931,11 @@
             <div className="form-group">
               <label className="form-label">Auto-Approve Below (USDC)</label>
               {I('autoApproveThreshold','number')}
-              <p className="form-hint">Transactions above this amount require manual approval.</p>
+              <p className="form-hint">Saved for HITL flows; pending approvals still require a click today.</p>
             </div>
           </div>
 
-          <p className="form-section">URL Firewall</p>
+          <p className="form-section">URL firewall (proxy)</p>
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Whitelisted URLs</label>
@@ -966,15 +949,17 @@
             </div>
           </div>
 
-          <p className="form-section">Address Controls</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>Stored for agent / HITL flows. Not enforced by the HTTP proxy in this release.</p>
+          <p className="form-section">Solana payTo allow / deny (proxy)</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>
+            Enforced on <strong>x402 payment recipients</strong> (<span className="mono">payTo</span> in the 402 challenge). <strong>Empty allowlist</strong> means any recipient is allowed except those on the denylist. Add your own wallet base58 here if you use a strict allowlist.
+          </p>
           <div className="grid-2">
-            <div className="form-group"><label className="form-label">Whitelisted Addresses</label>{T('whitelistedAddresses','SolanaAddress...')}</div>
-            <div className="form-group"><label className="form-label">Blacklisted Addresses</label>{T('blacklistedAddresses','BadActorAddress...')}</div>
+            <div className="form-group"><label className="form-label">Allowlisted addresses</label>{T('whitelistedAddresses','Solana base58...')}</div>
+            <div className="form-group"><label className="form-label">Denylisted addresses</label>{T('blacklistedAddresses','Never pay this base58...')}</div>
           </div>
 
-          <p className="form-section">On-Chain Program Controls</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>For agent-side policy / future use. Not enforced by plain HTTP forwarding.</p>
+          <p className="form-section">On-chain program IDs (config only)</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>Persisted for agent tooling — not checked by the HTTP proxy.</p>
           <div className="grid-2">
             <div className="form-group"><label className="form-label">Whitelisted Program IDs</label>{T('whitelistedProgramIDs','ProgramID...')}</div>
             <div className="form-group">
@@ -984,25 +969,25 @@
             </div>
           </div>
 
-          <p className="form-section">Behavioral Guardrails</p>
+          <p className="form-section">Hostname keywords (proxy)</p>
           <div className="grid-2">
             <div className="form-group">
-              <label className="form-label">Keyword Blocklist</label>
+              <label className="form-label">Keyword blocklist</label>
               {T('keywordBlocklist','drain\ncasino\nmeme')}
-              <p className="form-hint">Substring match on the request <strong>hostname</strong> only (paths like <span className="mono">/health</span> are not matched — avoids blocking your own API health checks).</p>
+              <p className="form-hint">Substring on <strong>hostname</strong> only — not URL paths (so <span className="mono">/health</span> is safe).</p>
             </div>
-            <div className="form-group"><label className="form-label">Forbidden Actions</label>{T('forbiddenActions','swap on unapproved DEX')}
-              <p className="form-hint">Agent prompts / HITL only; not parsed by the proxy.</p>
+            <div className="form-group"><label className="form-label">Forbidden actions (config)</label>{T('forbiddenActions','swap on unapproved DEX')}
+              <p className="form-hint">For agent prompts only — not parsed by the proxy.</p>
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Priority Instructions</label>
+            <label className="form-label">Priority instructions (config)</label>
             {T('priorityInstructions','Never interact with meme tokens. Only use approved DEXes.')}
-            <p className="form-hint">For agent prompts / tooling only; not enforced by the HTTP proxy.</p>
+            <p className="form-hint">For agent prompts / exports — not enforced by the HTTP proxy.</p>
           </div>
 
-          <p className="form-section">Token Restrictions</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>Stored for future hooks; x402 proxy does not inspect mints in this release.</p>
+          <p className="form-section">Token mints (config)</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>Persisted for future hooks; x402 proxy does not inspect SPL mints yet.</p>
           <div className="grid-2">
             <div className="form-group"><label className="form-label">Allowed Token Mints</label>{T('allowedTokenMints','Leave empty to allow all')}</div>
             <div className="form-group"><label className="form-label">Blocked Token Mints</label>{T('blockedTokenMints','MintAddress...')}</div>
@@ -1423,7 +1408,7 @@
             </div>
 
             <div className="content">
-              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl} proxyOverview={proxyOverview} stackPorts={stackPorts} stackStatus={stackStatus}/>}
+              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl} proxyOverview={proxyOverview}/>}
               {tab==='activity' && <ActivityTab activity={activity} pending={pending} proxyActivity={proxyActivity} onApprove={handleApprove} onDeny={handleDeny}/>}
               {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy} proxyPolicy={proxyPolicy} stackStatus={stackStatus}/>}
               {tab==='wallet'   && <WalletTab   walletStatus={walletStatus} onProvision={handleProvision}/>}

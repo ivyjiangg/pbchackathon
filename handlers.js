@@ -19,6 +19,9 @@ const PROXY_POLICY_PATH = path.join(AEGIS_DIR, 'proxy-policy.json');
 const PROXY_ACTIVITY_JSONL = path.join(AEGIS_DIR, 'proxy-activity.jsonl');
 const PACKAGE_PROXY_CONFIG = path.join(__dirname, 'packages', 'aegis-proxy', 'config.json');
 
+/** Older proxy-activity lines lack amount_micro; assume $0.50 for rollup. */
+const DEFAULT_X402_FALLBACK_MICRO = 500000n;
+
 const USDC_DECIMALS = 6;
 function usdcToMicroUnits(usdc) {
   const n = Number(usdc);
@@ -73,6 +76,17 @@ function collectHostnamesFromUrlList(raw) {
   return hosts;
 }
 
+/** One Solana address per line / comma — synced to proxy for x402 payTo checks. */
+function normalizeSolanaAddressList(raw) {
+  const lines = Array.isArray(raw) ? raw : String(raw || '').split(/[\n,]/);
+  const out = new Set();
+  for (const part of lines) {
+    const s = String(part).trim();
+    if (s) out.add(s);
+  }
+  return [...out].sort();
+}
+
 /** Writes ~/.aegis/proxy-policy.json: URL firewall, keywords, and x402 budget caps (micro-USDC, same units as payment amounts). */
 function syncProxyPolicyFromPolicy(policy) {
   const whiteHosts = collectHostnamesFromUrlList(policy.whitelistedURLs || []);
@@ -102,6 +116,9 @@ function syncProxyPolicyFromPolicy(policy) {
     existing = JSON.parse(fs.readFileSync(PACKAGE_PROXY_CONFIG, 'utf8'));
   }
 
+  const spentSnapshot = existing.spent_today;
+  const dateSnapshot = existing.last_reset_date;
+
   const dailyMicro = usdcToMicroUnits(
     policy.dailyBudget !== undefined ? policy.dailyBudget : policy.dailyBudgetUSDC ?? 2
   );
@@ -114,6 +131,12 @@ function syncProxyPolicyFromPolicy(policy) {
   existing.keyword_blocklist = [...new Set(keywordBlocklist)].sort();
   existing.daily_budget_lamports = dailyMicro;
   existing.per_tx_limit_micro_usdc = perTxMicro;
+  existing.recipient_allowlist = normalizeSolanaAddressList(policy.whitelistedAddresses);
+  existing.recipient_denylist = normalizeSolanaAddressList(policy.blacklistedAddresses);
+
+  // Never wipe x402 accounting written by the proxy process
+  if (spentSnapshot !== undefined) existing.spent_today = spentSnapshot;
+  if (dateSnapshot !== undefined) existing.last_reset_date = dateSnapshot;
 
   ensureDir();
   fs.writeFileSync(PROXY_POLICY_PATH, JSON.stringify(existing, null, 2));
@@ -254,6 +277,86 @@ function getWalletStatus() {
   };
 }
 
+/** Match proxy "business day" to dashboard: UTC and local YYYY-MM-DD (avoids date-line drift). */
+function proxyResetDateMatchesToday(reset) {
+  if (!reset || typeof reset !== 'string') return false;
+  const now = new Date();
+  const utcDay = now.toISOString().slice(0, 10);
+  const localDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return reset === utcDay || reset === localDay;
+}
+
+function readProxySpentTodayMicroUsdc() {
+  if (!fs.existsSync(PROXY_POLICY_PATH)) return 0n;
+  try {
+    const j = JSON.parse(fs.readFileSync(PROXY_POLICY_PATH, 'utf8'));
+    const spent = BigInt(j.spent_today ?? '0');
+    const reset = j.last_reset_date;
+    if (reset == null || reset === '') return spent;
+    return proxyResetDateMatchesToday(reset) ? spent : 0n;
+  } catch (_) {
+    return 0n;
+  }
+}
+
+function isSameLocalCalendarDay(isoTs, ref = new Date()) {
+  const t = new Date(isoTs);
+  if (Number.isNaN(t.getTime())) return false;
+  return (
+    t.getFullYear() === ref.getFullYear() &&
+    t.getMonth() === ref.getMonth() &&
+    t.getDate() === ref.getDate()
+  );
+}
+
+/**
+ * Rolling windows for x402 totals (HITL spend lives only in spend.json).
+ */
+function aggregateX402FromProxyJsonl() {
+  const out = {
+    weekMicro: 0n,
+    monthMicro: 0n,
+    todayMicro: 0n,
+    paidAllTime: 0,
+    paidToday: 0,
+  };
+  if (!fs.existsSync(PROXY_ACTIVITY_JSONL)) return out;
+  const refNow = new Date();
+  const now = Date.now();
+  const weekCutoff = now - 7 * 86400000;
+  const monthCutoff = now - 30 * 86400000;
+  let raw;
+  try {
+    raw = fs.readFileSync(PROXY_ACTIVITY_JSONL, 'utf8');
+  } catch (_) {
+    return out;
+  }
+  for (const line of raw.split(/\r?\n/).filter(Boolean)) {
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch (_) {
+      continue;
+    }
+    if (ev.outcome !== 'paid_success') continue;
+    out.paidAllTime++;
+    const ts = ev.ts || '';
+    const t = new Date(ts).getTime();
+    if (Number.isNaN(t)) continue;
+    const amt =
+      ev.amount_micro != null && String(ev.amount_micro).length > 0
+        ? BigInt(String(ev.amount_micro))
+        : DEFAULT_X402_FALLBACK_MICRO;
+    if (isSameLocalCalendarDay(ts, refNow)) {
+      out.paidToday++;
+      out.todayMicro += amt;
+    }
+    if (t >= weekCutoff) out.weekMicro += amt;
+    if (t >= monthCutoff) out.monthMicro += amt;
+  }
+  return out;
+}
+
 // ─── Handler: getSpendStats ───────────────────────────────────────────────────
 function getSpendStats() {
   const spend = readJSON(SPEND_PATH, buildDefaultSpend());
@@ -267,14 +370,39 @@ function getSpendStats() {
     writeJSON(SPEND_PATH, spend);
   }
 
+  const agg = aggregateX402FromProxyJsonl();
+  const fromPolicyMicro = readProxySpentTodayMicroUsdc();
+  const x402TodayMicro =
+    fromPolicyMicro > agg.todayMicro ? fromPolicyMicro : agg.todayMicro;
+  const x402TodayUSDC = Number(x402TodayMicro) / 1e6;
+  const x402WeekUSDC = Number(agg.weekMicro) / 1e6;
+  const x402MonthUSDC = Number(agg.monthMicro) / 1e6;
+
+  const hitlToday = Number(spend.spentTodayUSDC) || 0;
+  const hitlWeek = Number(spend.spentWeekUSDC) || 0;
+  const hitlMonth = Number(spend.spentMonthUSDC) || 0;
+
+  const mergedToday = +(hitlToday + x402TodayUSDC).toFixed(6);
+  const mergedWeek = +(hitlWeek + x402WeekUSDC).toFixed(6);
+  const mergedMonth = +(hitlMonth + x402MonthUSDC).toFixed(6);
+
+  const txTotal = spend.transactionCount + agg.paidAllTime;
+
   return {
     ...spend,
-    dailyBudgetUSDC:   config.dailyBudgetUSDC   || 0,
-    weeklyBudgetUSDC:  config.weeklyBudgetUSDC  || 0,
+    spentTodayUSDC: mergedToday,
+    spentWeekUSDC: mergedWeek,
+    spentMonthUSDC: mergedMonth,
+    transactionCount: txTotal,
+    hitlSpentTodayUSDC: hitlToday,
+    x402SpentTodayUSDC: x402TodayUSDC,
+    x402PaidToday: agg.paidToday,
+    dailyBudgetUSDC: config.dailyBudgetUSDC || 0,
+    weeklyBudgetUSDC: config.weeklyBudgetUSDC || 0,
     monthlyBudgetUSDC: config.monthlyBudgetUSDC || 0,
-    dailyRemaining:    Math.max(0, (config.dailyBudgetUSDC   || 0) - spend.spentTodayUSDC),
-    weeklyRemaining:   Math.max(0, (config.weeklyBudgetUSDC  || 0) - spend.spentWeekUSDC),
-    monthlyRemaining:  Math.max(0, (config.monthlyBudgetUSDC || 0) - spend.spentMonthUSDC)
+    dailyRemaining: Math.max(0, (config.dailyBudgetUSDC || 0) - mergedToday),
+    weeklyRemaining: Math.max(0, (config.weeklyBudgetUSDC || 0) - mergedWeek),
+    monthlyRemaining: Math.max(0, (config.monthlyBudgetUSDC || 0) - mergedMonth),
   };
 }
 
@@ -448,7 +576,9 @@ function getProxyPolicy() {
       daily_budget_micro_usdc: j.daily_budget_lamports,
       per_tx_limit_micro_usdc: j.per_tx_limit_micro_usdc,
       spent_today_micro_usdc: j.spent_today,
-      last_reset_date: j.last_reset_date
+      last_reset_date: j.last_reset_date,
+      recipient_allowlist: j.recipient_allowlist || [],
+      recipient_denylist: j.recipient_denylist || []
     };
   } catch (e) {
     return { path: PROXY_POLICY_PATH, exists: false, error: String(e.message) };
@@ -471,14 +601,14 @@ function getProxyActivity(limit) {
 }
 
 function getProxyOverviewStats() {
-  const today = new Date().toISOString().slice(0, 10);
+  const refNow = new Date();
   const { events } = getProxyActivity(800);
   let blocked = 0;
   let paid = 0;
   let forwarded = 0;
   for (const ev of events) {
     const ts = ev.ts || '';
-    if (!ts.startsWith(today)) continue;
+    if (!isSameLocalCalendarDay(ts, refNow)) continue;
     const o = ev.outcome || '';
     if (o === 'blocked_blacklist' || o === 'blocked_keyword' || o === 'blocked_not_whitelisted' || o === 'policy_denied') {
       blocked++;
@@ -488,7 +618,12 @@ function getProxyOverviewStats() {
       forwarded++;
     }
   }
-  return { today, blockedCount: blocked, paidCount: paid, forwardedCount: forwarded };
+  return {
+    today: refNow.toISOString().slice(0, 10),
+    blockedCount: blocked,
+    paidCount: paid,
+    forwardedCount: forwarded,
+  };
 }
 
 module.exports = {

@@ -211,6 +211,35 @@ function maxAmountFromPaymentRequired(pr) {
   return max;
 }
 
+/**
+ * x402 payTo (Solana) allow/deny — synced from Policy "Whitelisted / Blacklisted Addresses".
+ * Empty allowlist = allow any payTo except those on denylist.
+ */
+function evaluateRecipientPolicy(cfg, paymentRequired) {
+  const deny = new Set((cfg.recipient_denylist || []).map((x) => String(x).trim()).filter(Boolean));
+  const allow = (cfg.recipient_allowlist || []).map((x) => String(x).trim()).filter(Boolean);
+  const payTos = [];
+  for (const acc of paymentRequired.accepts || []) {
+    if (acc.payTo != null && String(acc.payTo).length > 0) {
+      payTos.push(String(acc.payTo).trim());
+    }
+  }
+  if (payTos.length === 0) return { ok: true };
+  for (const addr of payTos) {
+    if (deny.has(addr)) {
+      return { ok: false, reason: "payment recipient denied" };
+    }
+  }
+  if (allow.length > 0) {
+    for (const addr of payTos) {
+      if (!allow.includes(addr)) {
+        return { ok: false, reason: "payment recipient not allowlisted" };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 async function checkPolicy(paymentRequired, targetUrl) {
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const config = JSON.parse(raw);
@@ -218,6 +247,10 @@ async function checkPolicy(paymentRequired, targetUrl) {
   const urlEval = evaluateUrlPolicy(config, hostname);
   if (!urlEval.ok) {
     return { ok: false, reason: urlEval.reason, keyword: urlEval.keyword };
+  }
+  const recv = evaluateRecipientPolicy(config, paymentRequired);
+  if (!recv.ok) {
+    return { ok: false, reason: recv.reason };
   }
   const amount = maxAmountFromPaymentRequired(paymentRequired);
   const perTxCap = config.per_tx_limit_micro_usdc ?? config.per_tx_limit_lamports;
@@ -438,6 +471,7 @@ app.use(async (req, res) => {
         url: targetUrl,
         outcome: "paid_success",
         status: 200,
+        amount_micro: policy.amountLamports.toString(),
       });
     } else {
       await appendProxyActivity({
