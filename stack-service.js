@@ -45,6 +45,34 @@ function getProxyPolicyPath() {
   return DEFAULT_PROXY_POLICY;
 }
 
+/**
+ * Ensure loopback is allowlisted so local premium (:9090) works even if Policy was saved with an empty URL list.
+ * Respects blacklist: does not add a host that is blacklisted.
+ */
+function ensureLoopbackOnProxyWhitelistFile() {
+  if (!fs.existsSync(DEFAULT_PROXY_POLICY)) return;
+  try {
+    const j = JSON.parse(fs.readFileSync(DEFAULT_PROXY_POLICY, 'utf8'));
+    const bl = new Set((j.blacklist || []).map((x) => String(x).toLowerCase()));
+    const wl = new Set((j.whitelist || []).map((x) => String(x).toLowerCase()));
+    let changed = false;
+    if (!bl.has('127.0.0.1') && !wl.has('127.0.0.1')) {
+      wl.add('127.0.0.1');
+      changed = true;
+    }
+    if (!bl.has('localhost') && !wl.has('localhost')) {
+      wl.add('localhost');
+      changed = true;
+    }
+    if (changed) {
+      j.whitelist = [...wl].sort();
+      fs.writeFileSync(DEFAULT_PROXY_POLICY, JSON.stringify(j, null, 2));
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 function startStack(opts = {}) {
   if (proxyChild || premiumChild) {
     return { ok: false, error: 'Stack already running' };
@@ -55,6 +83,7 @@ function startStack(opts = {}) {
   const host = opts.host || '127.0.0.1';
 
   ensureProxyPolicyFile();
+  ensureLoopbackOnProxyWhitelistFile();
 
   const policyPath = getProxyPolicyPath();
   const env = {
@@ -65,6 +94,10 @@ function startStack(opts = {}) {
     AEGIS_PREMIUM_API_HOST: host,
     AEGIS_PROXY_CONFIG_PATH: policyPath,
   };
+  // Prefer in-memory key from Electron (provisioned wallet); overrides .env for proxy child only
+  if (opts.aegisPrivateKeyBase58) {
+    env.AEGIS_PRIVATE_KEY_BASE58 = opts.aegisPrivateKeyBase58;
+  }
 
   const node = getNodeCmd();
   const premiumEntry = path.join(ROOT, 'packages', 'aegis-premium-api', 'server.mjs');

@@ -16,7 +16,15 @@ const PENDING_PATH  = path.join(AEGIS_DIR, 'pending.json');
 const SPEND_PATH    = path.join(AEGIS_DIR, 'spend.json');
 const RECOVERY_PATH = path.join(AEGIS_DIR, 'share3-RECOVERY.txt');
 const PROXY_POLICY_PATH = path.join(AEGIS_DIR, 'proxy-policy.json');
+const PROXY_ACTIVITY_JSONL = path.join(AEGIS_DIR, 'proxy-activity.jsonl');
 const PACKAGE_PROXY_CONFIG = path.join(__dirname, 'packages', 'aegis-proxy', 'config.json');
+
+const USDC_DECIMALS = 6;
+function usdcToMicroUnits(usdc) {
+  const n = Number(usdc);
+  if (!Number.isFinite(n) || n < 0) return '0';
+  return String(BigInt(Math.floor(n * 10 ** USDC_DECIMALS)));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ensureDir() {
@@ -45,9 +53,15 @@ function parseHostnameFromLine(line) {
   }
 }
 
-/** Writes ~/.aegis/proxy-policy.json whitelist from Policy tab (hostname-only). */
-function syncProxyWhitelistFromPolicy(policy) {
-  const raw = policy.whitelistedURLs || [];
+/** If localhost or 127.0.0.1 is present, ensure both are allowed for local dev. */
+function expandLoopbackHosts(hostSet) {
+  if (hostSet.has('localhost') || hostSet.has('127.0.0.1')) {
+    hostSet.add('localhost');
+    hostSet.add('127.0.0.1');
+  }
+}
+
+function collectHostnamesFromUrlList(raw) {
   const lines = Array.isArray(raw) ? raw : [String(raw)];
   const hosts = new Set();
   for (const entry of lines) {
@@ -56,7 +70,28 @@ function syncProxyWhitelistFromPolicy(policy) {
       if (h) hosts.add(h);
     }
   }
-  const list = [...hosts].sort();
+  return hosts;
+}
+
+/** Writes ~/.aegis/proxy-policy.json: URL firewall, keywords, and x402 budget caps (micro-USDC, same units as payment amounts). */
+function syncProxyPolicyFromPolicy(policy) {
+  const whiteHosts = collectHostnamesFromUrlList(policy.whitelistedURLs || []);
+  const blackHosts = collectHostnamesFromUrlList(policy.blacklistedURLs || []);
+  expandLoopbackHosts(whiteHosts);
+  expandLoopbackHosts(blackHosts);
+  // Local premium API runs on 127.0.0.1/localhost — always allow unless explicitly blacklisted
+  if (!blackHosts.has('127.0.0.1')) whiteHosts.add('127.0.0.1');
+  if (!blackHosts.has('localhost')) whiteHosts.add('localhost');
+
+  const kwRaw = policy.keywordBlocklist || [];
+  const kwLines = Array.isArray(kwRaw) ? kwRaw : [String(kwRaw)];
+  const keywordBlocklist = [];
+  for (const entry of kwLines) {
+    for (const part of String(entry).split(/[\n,]/)) {
+      const k = part.trim().toLowerCase();
+      if (k) keywordBlocklist.push(k);
+    }
+  }
 
   let existing = {};
   if (fs.existsSync(PROXY_POLICY_PATH)) {
@@ -66,9 +101,26 @@ function syncProxyWhitelistFromPolicy(policy) {
   } else if (fs.existsSync(PACKAGE_PROXY_CONFIG)) {
     existing = JSON.parse(fs.readFileSync(PACKAGE_PROXY_CONFIG, 'utf8'));
   }
-  existing.whitelist = list;
+
+  const dailyMicro = usdcToMicroUnits(
+    policy.dailyBudget !== undefined ? policy.dailyBudget : policy.dailyBudgetUSDC ?? 2
+  );
+  const perTxMicro = usdcToMicroUnits(
+    policy.perTxLimit !== undefined ? policy.perTxLimit : policy.perTransactionLimitUSDC ?? 0.5
+  );
+
+  existing.whitelist = [...whiteHosts].sort();
+  existing.blacklist = [...blackHosts].sort();
+  existing.keyword_blocklist = [...new Set(keywordBlocklist)].sort();
+  existing.daily_budget_lamports = dailyMicro;
+  existing.per_tx_limit_micro_usdc = perTxMicro;
+
   ensureDir();
   fs.writeFileSync(PROXY_POLICY_PATH, JSON.stringify(existing, null, 2));
+}
+
+function syncProxyWhitelistFromPolicy(policy) {
+  syncProxyPolicyFromPolicy(policy);
 }
 
 function buildDefaultSpend() {
@@ -245,6 +297,22 @@ function resetSpendCounters(period) {
   }
 
   writeJSON(SPEND_PATH, spend);
+
+  // Keep x402 proxy caps in sync: spent_today lives in proxy-policy.json (not spend.json)
+  if (period === 'daily' || period === 'all') {
+    if (fs.existsSync(PROXY_POLICY_PATH)) {
+      try {
+        const pj = JSON.parse(fs.readFileSync(PROXY_POLICY_PATH, 'utf8'));
+        const today = new Date().toISOString().slice(0, 10);
+        pj.spent_today = '0';
+        pj.last_reset_date = today;
+        fs.writeFileSync(PROXY_POLICY_PATH, JSON.stringify(pj, null, 2));
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
   return { success: true, spend };
 }
 
@@ -359,6 +427,70 @@ async function getSOLBalance() {
   return { balance: lamports / LAMPORTS_PER_SOL };
 }
 
+function getProxyPolicy() {
+  if (!fs.existsSync(PROXY_POLICY_PATH)) {
+    return {
+      path: PROXY_POLICY_PATH,
+      exists: false,
+      whitelist: [],
+      blacklist: [],
+      keyword_blocklist: []
+    };
+  }
+  try {
+    const j = JSON.parse(fs.readFileSync(PROXY_POLICY_PATH, 'utf8'));
+    return {
+      path: PROXY_POLICY_PATH,
+      exists: true,
+      whitelist: j.whitelist || [],
+      blacklist: j.blacklist || [],
+      keyword_blocklist: j.keyword_blocklist || [],
+      daily_budget_micro_usdc: j.daily_budget_lamports,
+      per_tx_limit_micro_usdc: j.per_tx_limit_micro_usdc,
+      spent_today_micro_usdc: j.spent_today,
+      last_reset_date: j.last_reset_date
+    };
+  } catch (e) {
+    return { path: PROXY_POLICY_PATH, exists: false, error: String(e.message) };
+  }
+}
+
+function getProxyActivity(limit) {
+  const n = Number(limit) > 0 ? Number(limit) : 200;
+  if (!fs.existsSync(PROXY_ACTIVITY_JSONL)) return { events: [] };
+  const raw = fs.readFileSync(PROXY_ACTIVITY_JSONL, 'utf8');
+  const lines = raw.split(/\r?\n/).filter(Boolean);
+  const slice = lines.slice(-n);
+  const events = [];
+  for (const line of slice) {
+    try {
+      events.push(JSON.parse(line));
+    } catch (_) {}
+  }
+  return { events };
+}
+
+function getProxyOverviewStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const { events } = getProxyActivity(800);
+  let blocked = 0;
+  let paid = 0;
+  let forwarded = 0;
+  for (const ev of events) {
+    const ts = ev.ts || '';
+    if (!ts.startsWith(today)) continue;
+    const o = ev.outcome || '';
+    if (o === 'blocked_blacklist' || o === 'blocked_keyword' || o === 'blocked_not_whitelisted' || o === 'policy_denied') {
+      blocked++;
+    } else if (o === 'paid_success') {
+      paid++;
+    } else if (o === 'forwarded') {
+      forwarded++;
+    }
+  }
+  return { today, blockedCount: blocked, paidCount: paid, forwardedCount: forwarded };
+}
+
 module.exports = {
   provisionWallet,
   savePolicy,
@@ -372,5 +504,8 @@ module.exports = {
   denyTransaction,
   getActivity,
   airdropSOL,
-  getSOLBalance
+  getSOLBalance,
+  getProxyPolicy,
+  getProxyActivity,
+  getProxyOverviewStats
 };

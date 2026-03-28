@@ -2,7 +2,7 @@
   "name": "aegis-premium-api",
   "version": "1.0.0",
   "private": true,
-  "description": "Premium Data API (HTTP 402 + x402) for Aegis / OpenClaw demos",
+  "description": "Premium Data API (HTTP 402 + x402) for Aegis proxy demos",
   "type": "module",
   "scripts": {
     "start": "node server.mjs"

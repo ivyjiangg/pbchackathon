@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aegis — Agent demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a12;
+      --card: #12121e;
+      --border: rgba(255,255,255,0.07);
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --dim: #44445a;
+      --blue: #3b82f6;
+      --green: #10b981;
+      --mono: 'SF Mono', 'Fira Code', Consolas, monospace;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    header strong { color: var(--text); font-size: 14px; display: block; margin-bottom: 4px; }
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg {
+      max-width: 92%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      line-height: 1.45;
+      font-size: 12px;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #1e293b;
+      border: 1px solid var(--border);
+    }
+    .msg.agent {
+      align-self: flex-start;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+    .msg .role {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--dim);
+      margin-bottom: 6px;
+    }
+    .msg.agent .role { color: var(--blue); }
+    .msg.user .role { color: var(--muted); }
+    .toolbar {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #1a1a28;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button:hover { background: #222230; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary {
+      background: var(--blue);
+      border-color: transparent;
+      color: #fff;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    .hint {
+      padding: 0 16px 12px;
+      font-size: 11px;
+      color: var(--dim);
+      line-height: 1.4;
+    }
+    code { font-family: var(--mono); font-size: 11px; color: #94a3b8; }
+    .probe-panel {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      background: #0c0c14;
+    }
+    .probe-panel h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+    .probe-row { margin-bottom: 10px; }
+    .probe-row label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #161626;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    select { cursor: pointer; }
+    .quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .quick button {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Agent demo (simulated)</strong>
+    Framed for the <strong>agentic economy</strong> (policy + machine payments); hackathon build focuses on <strong>x402</strong> through the proxy — no live OpenClaw agent in this window. Scripted steps + real <strong>curl</strong> against the local stack (Start in main app).
+  </header>
+  <div id="log"></div>
+  <p class="hint">
+    On HTTP 402 the Aegis proxy adds x402 <code>PAYMENT-SIGNATURE</code> (payment auth), not arbitrary site API keys.
+    Spend caps: lower daily/per-tx on Policy, save, repeat requests — watch Activity.
+  </p>
+  <div class="probe-panel">
+    <h3>Probe a URL (stack running)</h3>
+    <div class="probe-row">
+      <label for="probeUrl">Target URL</label>
+      <input type="text" id="probeUrl" placeholder="http://127.0.0.1:9090/health" spellcheck="false" />
+    </div>
+    <div class="probe-row">
+      <label for="probeMode">How to send via proxy</label>
+      <select id="probeMode">
+        <option value="header">x-aegis-target header (default — same as Policy “probe”)</option>
+        <option value="proxyTunnel">HTTP proxy tunnel (-x) — use for full URL to your API</option>
+      </select>
+    </div>
+    <div class="quick">
+      <span style="font-size:10px;color:var(--dim);align-self:center;margin-right:4px;">Quick fill:</span>
+      <button type="button" id="fillBlocked">Blocked example</button>
+      <button type="button" id="fillHealth">Local API /health</button>
+      <button type="button" id="fillPremium">Premium x402 route</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button type="button" class="primary" id="btnProbe">Probe URL</button>
+      <span id="probeHint" style="font-size:10px;color:var(--dim);"></span>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="primary" id="btnScript">Run demo script</button>
+    <button type="button" id="btnLive">Run live checks</button>
+    <button type="button" id="btnClear">Clear</button>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const { execFileSync } = require('child_process');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const { parseProxyErrorBody } = require('./proxy-http-detail');
+
+    const logEl = document.getElementById('log');
+    let busy = false;
+
+    function addMsg(role, html) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + (role === 'user' ? 'user' : 'agent');
+      const label = role === 'user' ? 'You' : 'Agent';
+      div.innerHTML = '<div class="role">' + label + '</div><div>' + html + '</div>';
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function sleep(ms) {
+      return new Promise(function (r) { setTimeout(r, ms); });
+    }
+
+    async function runScriptedDemo() {
+      if (busy) return;
+      busy = true;
+      document.getElementById('btnScript').disabled = true;
+      document.getElementById('btnLive').disabled = true;
+      document.getElementById('btnProbe').disabled = true;
+      try {
+        addMsg('user', 'Fetch <code>https://blocked.invalid/</code> through the Aegis proxy.');
+        await sleep(500);
+        addMsg('agent', 'Request would hit the proxy with <code>x-aegis-target</code>. Host is not whitelisted → <strong>HTTP 403</strong>. Activity shows <code>blocked_not_whitelisted</code>.');
+        await sleep(400);
+        addMsg('user', 'Fetch premium API <code>/health</code> through the proxy.');
+        await sleep(500);
+        addMsg('agent', 'Whitelist includes <code>127.0.0.1</code> / localhost → forward succeeds → typically <strong>HTTP 200</strong>. Activity: <code>forwarded</code>.');
+        await sleep(400);
+        addMsg('user', 'Fetch <code>/v1/macro/premium-report</code> (paid route).');
+        await sleep(500);
+        addMsg('agent', 'Upstream returns <strong>402</strong>. Proxy parses <code>PAYMENT-REQUIRED</code>, checks caps, signs with your wallet key, retries with <code>PAYMENT-SIGNATURE</code>. You may see <strong>200</strong> (paid), <strong>402</strong> (settlement), or <strong>403</strong> (policy/caps).');
+        await sleep(400);
+        addMsg('agent', 'Click <strong>Run live checks</strong> with the stack running to show real status codes.');
+      } finally {
+        busy = false;
+        document.getElementById('btnScript').disabled = false;
+        document.getElementById('btnLive').disabled = false;
+        document.getElementById('btnProbe').disabled = false;
+      }
+    }
+
+    async function runLive() {
+      if (busy) return;
+      busy = true;
+      document.getElementById('btnScript').disabled = true;
+      document.getElementById('btnLive').disabled = true;
+      document.getElementById('btnProbe').disabled = true;
+      addMsg('user', 'Run live HTTP checks against the local stack.');
+      try {
+        const r = await ipcRenderer.invoke('agent-demo-live-check');
+        if (!r.ok) {
+          addMsg('agent', '<strong>Cannot run:</strong> ' + (r.error || 'Unknown error'));
+          return;
+        }
+        addMsg('agent', 'Using proxy <code>http://' + r.host + ':' + r.proxyPort + '</code> · premium port <code>' + r.premiumPort + '</code>');
+        for (let i = 0; i < r.steps.length; i++) {
+          const s = r.steps[i];
+          await sleep(200);
+          addMsg('agent', '<strong>' + s.label + '</strong><br>HTTP <code>' + s.httpCode + '</code><br><span style="color:#64748b">' + (s.detail || '') + '</span>');
+        }
+      } catch (e) {
+        addMsg('agent', 'Error: ' + (e.message || String(e)));
+      } finally {
+        busy = false;
+        document.getElementById('btnScript').disabled = false;
+        document.getElementById('btnLive').disabled = false;
+        document.getElementById('btnProbe').disabled = false;
+      }
+    }
+
+    document.getElementById('btnScript').addEventListener('click', runScriptedDemo);
+    document.getElementById('btnLive').addEventListener('click', runLive);
+    document.getElementById('btnClear').addEventListener('click', function () {
+      logEl.innerHTML = '';
+    });
+
+    function interpretCode(code, proxyReason) {
+      if (proxyReason) return proxyReason;
+      if (code === '403') return 'Usually policy denied (not whitelisted, blacklist, keyword, or spend cap). Check Activity; if premium route fails, reset spend on Overview or raise Daily Budget — proxy tracks spent in ~/.aegis/proxy-policy.json.';
+      if (code === '200') return 'Success — forwarded or paid response body from upstream.';
+      if (code === '402') return 'Payment required — proxy can add PAYMENT-SIGNATURE on retry (x402).';
+      if (code === '502' || code === '500') return 'Proxy or upstream error — see stack logs in main app.';
+      return 'See main app Activity for proxy JSONL lines.';
+    }
+
+    let stackHint = { host: '127.0.0.1', premium: '9090' };
+    ipcRenderer.invoke('aegis-stack-status').then(function (st) {
+      if (!st) return;
+      stackHint.host = st.host || '127.0.0.1';
+      if (st.premiumPort) stackHint.premium = String(st.premiumPort);
+      document.getElementById('probeHint').textContent =
+        'Ports from app: proxy ' + (st.proxyPort || '—') + ' · premium ' + (st.premiumPort || '—');
+    }).catch(function () {});
+
+    function fillHealth() {
+      document.getElementById('probeUrl').value =
+        'http://' + stackHint.host + ':' + stackHint.premium + '/health';
+      document.getElementById('probeMode').value = 'header';
+    }
+    function fillPremium() {
+      document.getElementById('probeUrl').value =
+        'http://' + stackHint.host + ':' + stackHint.premium + '/v1/macro/premium-report';
+      document.getElementById('probeMode').value = 'proxyTunnel';
+    }
+    function fillBlocked() {
+      document.getElementById('probeUrl').value = 'https://blocked.invalid/';
+      document.getElementById('probeMode').value = 'header';
+    }
+
+    document.getElementById('fillBlocked').addEventListener('click', fillBlocked);
+    document.getElementById('fillHealth').addEventListener('click', fillHealth);
+    document.getElementById('fillPremium').addEventListener('click', fillPremium);
+
+    async function runProbe() {
+      if (busy) return;
+      const url = document.getElementById('probeUrl').value.trim();
+      if (!url) {
+        addMsg('agent', 'Enter a full URL (e.g. <code>http://127.0.0.1:9090/health</code>).');
+        return;
+      }
+      busy = true;
+      document.getElementById('btnProbe').disabled = true;
+      addMsg('user', 'Probe <code>' + url.replace(/</g, '&lt;') + '</code>');
+      try {
+        const st = await ipcRenderer.invoke('aegis-stack-status');
+        if (!st || !st.proxyRunning) {
+          addMsg('agent', '<strong>Start the local stack</strong> in the main app (proxy must be running).');
+          return;
+        }
+        let u;
+        try {
+          u = new URL(url);
+        } catch {
+          addMsg('agent', 'Invalid URL — use a full URL with <code>http://</code> or <code>https://</code>.');
+          return;
+        }
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+          addMsg('agent', 'Only http(s) URLs are supported.');
+          return;
+        }
+        const href = u.href;
+        const tunnel = document.getElementById('probeMode').value === 'proxyTunnel';
+        const host = st.host || '127.0.0.1';
+        const pxy = String(st.proxyPort);
+        const proxyBase = 'http://' + host + ':' + pxy + '/';
+        const tmp = path.join(os.tmpdir(), 'aegis-probe-' + Date.now() + '.txt');
+        let httpCode;
+        let body = '';
+        try {
+          if (tunnel) {
+            httpCode = execFileSync('curl', [
+              '-sS', '-o', tmp, '-w', '%{http_code}',
+              '-x', proxyBase, href,
+            ], { encoding: 'utf8' }).trim();
+          } else {
+            httpCode = execFileSync('curl', [
+              '-sS', '-o', tmp, '-w', '%{http_code}',
+              '-H', 'x-aegis-target: ' + href,
+              proxyBase,
+            ], { encoding: 'utf8' }).trim();
+          }
+          try {
+            body = fs.readFileSync(tmp, 'utf8');
+          } catch (_) {
+            /* ignore */
+          }
+        } finally {
+          try {
+            fs.unlinkSync(tmp);
+          } catch (_) {
+            /* ignore */
+          }
+        }
+        const proxyReason = httpCode === '403' ? parseProxyErrorBody(body) : null;
+        const modeLabel = tunnel ? 'HTTP proxy <code>-x</code>' : '<code>x-aegis-target</code>';
+        addMsg(
+          'agent',
+          '<strong>Result</strong> · ' + modeLabel + '<br>HTTP <code>' + httpCode + '</code><br><span style="color:#64748b">' +
+            interpretCode(httpCode, proxyReason) +
+            '</span><br><span style="font-size:10px;color:#475569">Proxy: ' + proxyBase + '</span>',
+        );
+      } catch (e) {
+        addMsg('agent', 'Error: ' + (e.message || String(e)) + ' — is <code>curl</code> installed and on PATH?');
+      } finally {
+        busy = false;
+        document.getElementById('btnProbe').disabled = false;
+      }
+    }
+
+    document.getElementById('btnProbe').addEventListener('click', runProbe);
+
+    addMsg('agent', 'Use <strong>Probe a URL</strong> / <strong>Run live checks</strong> to validate the proxy + premium API (x402 path). Main story is <strong>not</strong> an LLM gateway — it is HTTP 402 → PAYMENT-SIGNATURE → policy/caps.');
+  </script>
+</body>
+</html>

@@ -457,6 +457,7 @@
     const StatusPill = ({ status }) => {
       const cls = status === 'APPROVED' ? 'pill-approved'
                 : status === 'BLOCKED'  ? 'pill-blocked'
+                : status === 'FORWARD'  ? 'pill-active'
                 :                         'pill-pending';
       return <span className={`pill ${cls}`}>{status}</span>;
     };
@@ -536,8 +537,8 @@
           </div>
         </div>
         <p style={{fontSize:'12px', color:'var(--muted)', marginBottom:'14px', lineHeight:1.5}}>
-          Runs premium API and the Aegis x402 proxy. Put <span className="mono">AEGIS_PRIVATE_KEY_BASE58</span> (or <span className="mono">X402_PAY_TO</span>) in a <span className="mono">.env</span> file at the repo root — it is loaded when the app starts. You can also export vars in your shell before <span className="mono">npm start</span>.
-          Proxy policy file: <span className="mono">~/.aegis/proxy-policy.json</span> — URL whitelist is synced when you save Policy.
+          Runs premium API and the Aegis x402 proxy. If you have provisioned a wallet, <strong>Start</strong> passes that key to the proxy in memory (same pubkey as the app). Otherwise use <span className="mono">AEGIS_PRIVATE_KEY_BASE58</span> in repo-root <span className="mono">.env</span> (loaded on app launch).
+          Proxy policy: <span className="mono">~/.aegis/proxy-policy.json</span> — synced when you save Policy.
         </p>
         <div className="grid-2" style={{marginBottom:'12px'}}>
           <div className="form-group">
@@ -585,10 +586,66 @@
       </div>
     );
 
+    // ── DEMO (copy-paste curls) ───────────────────────────────────────────────
+    const DemoFlowCard = ({ stackPorts, stackStatus }) => {
+      const [copied, setCopied] = useState(null);
+      const flash = (id) => { setCopied(id); setTimeout(() => setCopied(null), 1600); };
+      const clip = (id, text) => {
+        try {
+          require('electron').clipboard.writeText(text);
+          flash(id);
+        } catch (e) { console.error(e); }
+      };
+      const h = (stackStatus && stackStatus.host) || '127.0.0.1';
+      const pxy = (stackStatus && stackStatus.proxyPort) || (stackPorts && stackPorts.proxy) || 8080;
+      const prm = (stackStatus && stackStatus.premiumPort) || (stackPorts && stackPorts.premium) || 9090;
+      const nd = '/dev/null';
+      const rows = [
+        { id: 'b', label: '1. Blocked host (expect 403)', cmd: `curl -sS -o ${nd} -w "%{http_code}" -H "x-aegis-target: https://blocked.invalid/" http://${h}:${pxy}/` },
+        { id: 'f', label: '2. Allowed /health (expect 200)', cmd: `curl -sS -o ${nd} -w "%{http_code}" -H "x-aegis-target: http://${h}:${prm}/health" http://${h}:${pxy}/` },
+        { id: 'x', label: '3. Premium x402 via proxy', cmd: `curl -sS -w "%{http_code}" -x http://${h}:${pxy}/ http://${h}:${prm}/v1/macro/premium-report` },
+        { id: 'n', label: '4. Full script (repo root terminal)', cmd: `AEGIS_PROXY_HOST=${h} AEGIS_PROXY_PORT=${pxy} AEGIS_PREMIUM_PORT=${prm} npm run demo:agent-flow` },
+      ];
+      return (
+        <div className="card" style={{marginBottom:'16px'}}>
+          <div className="sec-hdr"><span className="sec-title">Demo — terminal commands</span></div>
+          <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.55, marginBottom:'12px'}}>
+            Start the stack above, then run these from the <span className="mono">pbchackathon</span> repo (Windows: use <span className="mono">NUL</span> instead of <span className="mono">/dev/null</span>). On HTTP 402 the proxy adds x402 <span className="mono">PAYMENT-SIGNATURE</span> (not arbitrary API keys). For spend caps, lower daily/per-tx on Policy and repeat step 3 — watch Activity.
+          </p>
+          <p style={{fontSize:'11px', color:'var(--dim)', fontFamily:'var(--mono)', marginBottom:'14px'}}>host={h} proxy={pxy} premium={prm}</p>
+          {rows.map(({ id, label, cmd }) => (
+            <div key={id} style={{marginBottom:'12px'}}>
+              <div style={{fontSize:'11px', color:'var(--dim)', marginBottom:'4px'}}>{label}</div>
+              <div style={{display:'flex', gap:'8px', alignItems:'flex-start', flexWrap:'wrap'}}>
+                <pre style={{flex:1, minWidth:'200px', background:'#161626', border:'1px solid var(--border)', borderRadius:'6px', padding:'8px', fontSize:'10px', whiteSpace:'pre-wrap', wordBreak:'break-all', color:'var(--muted)', margin:0}}>{cmd}</pre>
+                <button type="button" className="btn btn-outline" style={{flexShrink:0}} onClick={() => clip(id, cmd)}>{copied === id ? 'Copied' : 'Copy'}</button>
+              </div>
+            </div>
+          ))}
+          <p style={{fontSize:'11px', color:'var(--dim)', marginTop:'8px', lineHeight:1.5}}>
+            Core demo: x402 through the proxy (steps above). Optional external agent env: <span className="mono">packages/aegis-openclaw/proxies-env.example</span> — <span className="mono">docs/demo-agent.md</span>.
+          </p>
+        </div>
+      );
+    };
+
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
-    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack }) => (
+    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack, proxyOverview, stackPorts, stackStatus }) => (
       <div>
         {localStack}
+        <DemoFlowCard stackPorts={stackPorts} stackStatus={stackStatus} />
+        {proxyOverview && (
+          <div className="card" style={{marginBottom:'16px'}}>
+            <div className="sec-hdr"><span className="sec-title">Proxy activity (today)</span></div>
+            <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.6, margin:0}}>
+              Blocked: <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.blockedCount}</span>
+              {' · '}
+              Forwards (non-402): <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.forwardedCount}</span>
+              {' · '}
+              Paid (x402 success): <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.paidCount}</span>
+            </p>
+          </div>
+        )}
         {pendingCount > 0 && (
           <div className="alert-banner">
             <span>⚠</span>
@@ -627,7 +684,10 @@
         </div>
 
         <div className="card">
-          <div className="sec-hdr"><span className="sec-title">Budget Utilization</span></div>
+          <div className="sec-hdr"><span className="sec-title">Budget Utilization (wallet / HITL)</span></div>
+          <p style={{fontSize:'11px', color:'var(--dim)', marginBottom:'12px', lineHeight:1.5}}>
+            Daily and per-tx limits on the Policy tab also sync to the <span className="mono">proxy</span> for x402 payments. Weekly/monthly below are dashboard-only.
+          </p>
           {stats
             ? <div>
                 <BudgetBar label="Daily"   spent={stats.spentTodayUSDC} total={stats.dailyBudgetUSDC}/>
@@ -640,7 +700,7 @@
     );
 
     // ── ACTIVITY TAB ──────────────────────────────────────────────────────────
-    const ActivityTab = ({ activity, pending, onApprove, onDeny }) => {
+    const ActivityTab = ({ activity, pending, proxyActivity, onApprove, onDeny }) => {
       const [processing, setProcessing] = useState({});
 
       const approve = async (id) => {
@@ -654,17 +714,38 @@
         setProcessing(p => ({...p, [id]: null}));
       };
 
-      const fmt = ts => new Date(ts).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      const fmt = ts => {
+        try { return new Date(ts).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
+        catch (_) { return '—'; }
+      };
+
+      const proxyRows = (proxyActivity || []).map((ev, i) => {
+        const o = ev.outcome || '';
+        let st = 'BLOCKED';
+        if (o === 'paid_success') st = 'APPROVED';
+        else if (o === 'forwarded') st = 'FORWARD';
+        return {
+          id: 'proxy-' + i + '-' + (ev.ts || ''),
+          _proxy: true,
+          status: st,
+          url: ev.url || ev.hostname || '—',
+          amount: 0,
+          timestamp: ev.ts,
+          _detail: o
+        };
+      });
 
       const pendingRows = (pending || []).map(p => ({...p, _pending: true}));
       const resolvedRows = (activity || []).filter(a => a.status !== 'PENDING')
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      const allRows = [...pendingRows, ...resolvedRows].slice(0, 60);
+      const allRows = [...proxyRows, ...pendingRows, ...resolvedRows]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 80);
 
       if (allRows.length === 0) {
         return (
           <div className="card">
-            <EmptyState message="No activity yet. Requests from the agent will appear here in real time."/>
+            <EmptyState message="No activity yet. Start the local stack and use the proxy — events appear here. HITL approvals also show under Source: Wallet."/>
           </div>
         );
       }
@@ -678,6 +759,7 @@
           <table className="activity-table">
             <thead>
               <tr>
+                <th className="activity-th">Source</th>
                 <th className="activity-th">Status</th>
                 <th className="activity-th">Endpoint</th>
                 <th className="activity-th right">Amount</th>
@@ -687,11 +769,13 @@
             <tbody>
               {allRows.map((row, i) => (
                 <tr key={row.id || i} className={`activity-row ${row._pending ? 'pending-row' : ''}`}>
+                  <td className="a-time" style={{fontSize:'11px', color:'var(--dim)'}}>{row._proxy ? 'Proxy' : 'Wallet'}</td>
                   <td style={{paddingTop: row._pending ? '14px' : undefined}}>
                     <StatusPill status={row._pending ? 'PENDING' : row.status}/>
                   </td>
                   <td>
                     <div className="a-url">{row.url || '—'}</div>
+                    {row._proxy && row._detail ? <div className="a-sig">{row._detail}</div> : null}
                     {row._pending && (
                       <div className="pending-expand">
                         <div className="pending-detail">
@@ -727,10 +811,11 @@
     };
 
     // ── POLICY TAB ────────────────────────────────────────────────────────────
-    const PolicyTab = ({ config, onSave }) => {
+    const PolicyTab = ({ config, onSave, proxyPolicy, stackStatus }) => {
       const arrStr = a => (a || []).join('\n');
       const toArr  = s => s.split('\n').map(x => x.trim()).filter(Boolean);
 
+      const [probeMsg, setProbeMsg] = useState(null);
       const [f, setF] = useState({
         dailyBudget:'2.00', weeklyBudget:'10.00', monthlyBudget:'50.00',
         perTxLimit:'0.50', autoApproveThreshold:'1.00',
@@ -799,6 +884,24 @@
         <textarea className="form-textarea" value={f[key]} onChange={set(key)} placeholder={placeholder}/>
       );
 
+      const runProbe = async () => {
+        setProbeMsg(null);
+        if (!stackStatus || !stackStatus.proxyRunning) {
+          setProbeMsg('Start the local stack first.');
+          return;
+        }
+        const host = stackStatus.host || '127.0.0.1';
+        const pp = stackStatus.proxyPort;
+        try {
+          const r = await fetch('http://' + host + ':' + pp + '/', {
+            headers: { 'x-aegis-target': 'http://example.com/' }
+          });
+          setProbeMsg('Probe example.com (not whitelisted): HTTP ' + r.status + ' — expect 403');
+        } catch (e) {
+          setProbeMsg(String(e.message || e));
+        }
+      };
+
       return (
         <div className="card">
           <div className="sec-hdr" style={{marginBottom:'4px'}}>
@@ -808,7 +911,33 @@
             </button>
           </div>
 
+          {proxyPolicy && proxyPolicy.exists === false && (
+            <div style={{border:'1px dashed var(--border)', borderRadius:'8px', padding:'12px', marginBottom:'16px'}}>
+              <p style={{fontSize:'12px', color:'var(--muted)', margin:0}}>Save Policy once to create <span className="mono">~/.aegis/proxy-policy.json</span> (URL firewall + x402 caps).</p>
+            </div>
+          )}
+          {proxyPolicy && proxyPolicy.exists && (
+            <div style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'14px', marginBottom:'16px'}}>
+              <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Effective proxy policy (on disk)</span></div>
+              <p style={{fontSize:'11px', color:'var(--dim)', lineHeight:1.5, marginBottom:'10px'}}>
+                When an upstream returns HTTP 402, the proxy signs x402 payment requirements and retries with <span className="mono">PAYMENT-SIGNATURE</span> — not generic third-party API keys.
+              </p>
+              <p style={{fontSize:'10px', color:'var(--dim)', fontFamily:'var(--mono)', wordBreak:'break-all', marginBottom:'10px'}}>{proxyPolicy.path}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Whitelist</strong>: {(proxyPolicy.whitelist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Blacklist</strong>: {(proxyPolicy.blacklist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Keywords</strong>: {(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</p>
+              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Proxy daily cap (micro-USDC)</strong>: {String(proxyPolicy.daily_budget_micro_usdc || '')}</p>
+              <div style={{marginTop:'12px', display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center'}}>
+                <button type="button" className="btn btn-outline" onClick={runProbe}>Probe non-whitelisted host</button>
+                {probeMsg ? <span style={{fontSize:'11px', fontFamily:'var(--mono)', color:'var(--muted)'}}>{probeMsg}</span> : null}
+              </div>
+            </div>
+          )}
+
           <p className="form-section">Spend Controls</p>
+          <p className="form-hint" style={{marginBottom:'14px'}}>
+            Daily and per-tx limits sync to the Aegis proxy for x402 payments (micro-USDC, same units as on-chain payment amounts). Weekly/monthly below are tracked in this dashboard only.
+          </p>
           <div className="grid-3">
             <div className="form-group"><label className="form-label">Daily Budget (USDC)</label>{I('dailyBudget','number')}</div>
             <div className="form-group"><label className="form-label">Weekly Budget (USDC)</label>{I('weeklyBudget','number')}</div>
@@ -828,28 +957,30 @@
             <div className="form-group">
               <label className="form-label">Whitelisted URLs</label>
               {T('whitelistedURLs','localhost:9090\napi.trusted.com')}
-              <p className="form-hint">One per line. Hostnames are synced to the Aegis proxy whitelist (~/.aegis/proxy-policy.json). Ports/paths are stripped (e.g. localhost:9090 → localhost).</p>
+              <p className="form-hint">One per line. Hostnames sync to the proxy; localhost and 127.0.0.1 are both added when either appears.</p>
             </div>
             <div className="form-group">
               <label className="form-label">Blacklisted URLs</label>
               {T('blacklistedURLs','casino.com\ndrain.io')}
-              <p className="form-hint">Always blocked regardless of budget.</p>
+              <p className="form-hint">Enforced by the Aegis proxy (403) when the local stack is running.</p>
             </div>
           </div>
 
           <p className="form-section">Address Controls</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>Stored for agent / HITL flows. Not enforced by the HTTP proxy in this release.</p>
           <div className="grid-2">
             <div className="form-group"><label className="form-label">Whitelisted Addresses</label>{T('whitelistedAddresses','SolanaAddress...')}</div>
             <div className="form-group"><label className="form-label">Blacklisted Addresses</label>{T('blacklistedAddresses','BadActorAddress...')}</div>
           </div>
 
           <p className="form-section">On-Chain Program Controls</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>For agent-side policy / future use. Not enforced by plain HTTP forwarding.</p>
           <div className="grid-2">
             <div className="form-group"><label className="form-label">Whitelisted Program IDs</label>{T('whitelistedProgramIDs','ProgramID...')}</div>
             <div className="form-group">
               <label className="form-label">Blacklisted Program IDs</label>
               {T('blacklistedProgramIDs','BadProgramID...')}
-              <p className="form-hint">Blocks agent from interacting with unapproved protocols.</p>
+              <p className="form-hint">Intended for agent tooling, not the x402 proxy.</p>
             </div>
           </div>
 
@@ -858,17 +989,20 @@
             <div className="form-group">
               <label className="form-label">Keyword Blocklist</label>
               {T('keywordBlocklist','drain\ncasino\nmeme')}
-              <p className="form-hint">Requests containing these words are blocked.</p>
+              <p className="form-hint">Substring match on the request <strong>hostname</strong> only (paths like <span className="mono">/health</span> are not matched — avoids blocking your own API health checks).</p>
             </div>
-            <div className="form-group"><label className="form-label">Forbidden Actions</label>{T('forbiddenActions','swap on unapproved DEX')}</div>
+            <div className="form-group"><label className="form-label">Forbidden Actions</label>{T('forbiddenActions','swap on unapproved DEX')}
+              <p className="form-hint">Agent prompts / HITL only; not parsed by the proxy.</p>
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Priority Instructions</label>
             {T('priorityInstructions','Never interact with meme tokens. Only use approved DEXes.')}
-            <p className="form-hint">Free-text rules the agent must always respect.</p>
+            <p className="form-hint">For agent prompts / tooling only; not enforced by the HTTP proxy.</p>
           </div>
 
           <p className="form-section">Token Restrictions</p>
+          <p className="form-hint" style={{marginBottom:'12px'}}>Stored for future hooks; x402 proxy does not inspect mints in this release.</p>
           <div className="grid-2">
             <div className="form-group"><label className="form-label">Allowed Token Mints</label>{T('allowedTokenMints','Leave empty to allow all')}</div>
             <div className="form-group"><label className="form-label">Blocked Token Mints</label>{T('blockedTokenMints','MintAddress...')}</div>
@@ -1059,6 +1193,9 @@
       const [stats, setStats]           = useState(null);
       const [activity, setActivity]     = useState([]);
       const [pending, setPending]       = useState([]);
+      const [proxyPolicy, setProxyPolicy] = useState(null);
+      const [proxyActivity, setProxyActivity] = useState([]);
+      const [proxyOverview, setProxyOverview] = useState(null);
       const [stackPorts, setStackPorts] = useState(() => {
         try {
           const s = localStorage.getItem('aegis-stack-ports');
@@ -1197,6 +1334,18 @@
           setActivity(act || []);
           setPending(pnd || []);
         } catch(e) { console.error('Refresh:', e); }
+        try {
+          const pp = await ipc.invoke('get-proxy-policy');
+          setProxyPolicy(pp);
+        } catch (e) { console.error('get-proxy-policy:', e); }
+        try {
+          const pa = await ipc.invoke('get-proxy-activity', 150);
+          setProxyActivity((pa && pa.events) ? pa.events : []);
+        } catch (e) { console.error('get-proxy-activity:', e); }
+        try {
+          const po = await ipc.invoke('get-proxy-overview-stats');
+          setProxyOverview(po);
+        } catch (e) { console.error('get-proxy-overview-stats:', e); }
       }, []);
 
       useEffect(() => { refresh(); const t = setInterval(refresh, 2000); return () => clearInterval(t); }, [refresh]);
@@ -1256,6 +1405,10 @@
                 {tab==='overview' ? 'Overview' : tab==='activity' ? 'Transaction Activity' : tab==='policy' ? 'Policy Rules' : 'Wallet & Key Management'}
               </span>
               <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+                <button type="button" className="btn btn-outline" style={{fontSize:'12px', padding:'6px 12px'}}
+                  onClick={() => ipc.invoke('open-agent-demo-window')}>
+                  Agent demo chat
+                </button>
                 {walletStatus && walletStatus.publicKey && (
                   <span style={{fontSize:'11px', fontFamily:'monospace', color:'var(--dim)'}}>
                     {walletStatus.publicKey.slice(0,6)}…{walletStatus.publicKey.slice(-4)}
@@ -1270,9 +1423,9 @@
             </div>
 
             <div className="content">
-              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl}/>}
-              {tab==='activity' && <ActivityTab activity={activity} pending={pending} onApprove={handleApprove} onDeny={handleDeny}/>}
-              {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy}/>}
+              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl} proxyOverview={proxyOverview} stackPorts={stackPorts} stackStatus={stackStatus}/>}
+              {tab==='activity' && <ActivityTab activity={activity} pending={pending} proxyActivity={proxyActivity} onApprove={handleApprove} onDeny={handleDeny}/>}
+              {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy} proxyPolicy={proxyPolicy} stackStatus={stackStatus}/>}
               {tab==='wallet'   && <WalletTab   walletStatus={walletStatus} onProvision={handleProvision}/>}
             </div>
           </div>

@@ -1,6 +1,10 @@
 # aegis-openclaw
 
+**Optional / auxiliary.** The **agentic-economy** arc assumes an agent’s outbound HTTP eventually goes through Aegis (same as this folder describes for OpenClaw). For the **hackathon demo** we did not ship a running OpenClaw gateway; the **x402 + proxy + Electron** path in the repo root README is what we validated end-to-end. Use this package when you **do** attach an agent—**OpenClaw** or otherwise—to the same proxy.
+
 Templates for running [OpenClaw](https://github.com/openclaw/openclaw) with HTTP(S) traffic routed through **Aegis** (`127.0.0.1:8080`). Nothing here installs OpenClaw; use the official CLI (`openclaw onboard`, `openclaw gateway run`).
+
+**Full demo runbook (x402-focused):** [docs/demo-agent.md](../../docs/demo-agent.md).
 
 ## Files
 

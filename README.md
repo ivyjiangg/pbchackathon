@@ -2,6 +2,14 @@
 
 Monorepo for the hackathon: **npm workspaces** under `packages/`. Install once at the repo root; each package keeps its own `package.json`.
 
+### Vision: agentic economy
+
+The broader goal is **agents that pay and operate inside policy**—HTTP traffic through a gateway, machine-readable payments (**x402**), spend caps, and URL guardrails. That is the “agentic economy” story this stack is meant to support.
+
+### Hackathon scope (what we shipped)
+
+We did **not** get an **OpenClaw** (or similar) agent gateway fully running in time for the hackathon, so the **demo and judge path focus on the x402 protocol end-to-end**: premium API → **402** → Aegis proxy → **PAYMENT-SIGNATURE** → policy / caps, plus the Electron shell for wallet + policy + activity. [`packages/aegis-openclaw/`](packages/aegis-openclaw/) remains **optional reference** (proxy env examples) for when an agent *does* sit in front of the same HTTP path.
+
 ## Repository layout
 
 ```
@@ -11,7 +19,7 @@ pbchackathon/
     README.md           # package index
     aegis-proxy/        # Express x402 / Solana proxy (Dev 2)
     aegis-premium-api/     # Premium API :9090 (Dev 3)
-    aegis-openclaw/     # OpenClaw templates + prompts (Dev 3)
+    aegis-openclaw/     # Optional: external agent proxy env examples (not required for x402 demo)
 ```
 
 Teammates can add new folders under `packages/`; they are picked up automatically by `"workspaces": ["packages/*"]`.
@@ -114,14 +122,14 @@ x-aegis-target: https://api.example.com/v1/resource
 
 express, axios, @solana/web3.js, @solana/kit, @x402/core, @x402/svm, bs58. Solana x402 uses **`@x402/svm`**, not `@x402/solana`.
 
-## Person 3 (premium API + OpenClaw)
+## x402 demo stack (premium API + Aegis proxy)
 
-**Scoped to Track 1 / demo plumbing** — not the full PRD V2 (Squads, HITL, program-ID blocks); those stay with other teammates.
+**Primary hackathon story:** HTTP **402** from the premium API → Aegis proxy **intercepts**, signs with your Solana key, retries with **`PAYMENT-SIGNATURE`**, policy + spend caps in `~/.aegis/proxy-policy.json`. Prove it with **Electron** (local stack + Policy + Activity), **`npm run demo:agent-flow`**, or **`npm test`**.
 
 ### Packages
 
 - **`aegis-premium-api`** — `GET /v1/macro/premium-report` on `127.0.0.1:9090`, protected with `@x402/express` and the **exact** SVM scheme on **Solana devnet** (network id `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`).
-- **`aegis-openclaw`** — Example `network.proxy` → `http://127.0.0.1:8080`, narrow `network.noProxy` for LLM hosts, and a demo prompt under `prompts/`.
+- **`aegis-proxy`** — HTTP proxy on `:8080`; x402 client flow, URL policy, daily/per-tx caps (see repo root README above).
 
 ### Commands
 
@@ -131,9 +139,9 @@ export AEGIS_PRIVATE_KEY_BASE58="<same-as-proxy>"   # or set X402_PAY_TO on the 
 npm run start:premium-api
 ```
 
-OpenClaw: merge [`packages/aegis-openclaw/openclaw.json5.example`](packages/aegis-openclaw/openclaw.json5.example) into `~/.openclaw/openclaw.json` and follow [`packages/aegis-openclaw/README.md`](packages/aegis-openclaw/README.md).
+**Optional (not required for x402):** [`aegis-openclaw`](packages/aegis-openclaw/) has example `HTTP_PROXY` / `NO_PROXY` env and prompts if you later route an external agent through the same proxy.
 
-### End-to-end HTTP check (no OpenClaw)
+### End-to-end HTTP check (curl / Electron)
 
 ```bash
 curl -i http://127.0.0.1:9090/v1/macro/premium-report
@@ -142,12 +150,27 @@ curl -i -x http://127.0.0.1:8080 http://127.0.0.1:9090/v1/macro/premium-report
 
 The second command should show Aegis logging a 402 intercept and attempting payment. A **200** response after payment requires a **devnet USDC–funded** wallet for the x402 facilitator flow (see [`packages/aegis-premium-api/README.md`](packages/aegis-premium-api/README.md)).
 
+### Judge-ready demo (policy, agent, proxy, caps)
+
+Full walkthrough: **[docs/demo-agent.md](docs/demo-agent.md)**. With the **local stack running** (Electron **Start** or manual processes):
+
+```bash
+npm run demo:agent-flow
+```
+
+Override ports if needed: `AEGIS_PROXY_PORT`, `AEGIS_PREMIUM_PORT`, `AEGIS_PROXY_HOST`.
+
+**Electron:** When you start the stack from the app, the proxy child receives **`AEGIS_PRIVATE_KEY_BASE58` from your provisioned Shamir wallet** (reconstructed in the main process, not written to disk). If you are not provisioned, the proxy still uses `.env` / its dev fallback.
+
+**Wording:** On HTTP **402**, the proxy injects **x402 `PAYMENT-SIGNATURE`** (Solana payment authorization), not arbitrary third-party API keys.
+
 ### Scripts
 
 - `npm run start:premium-api` — premium API only.
 - `npm run demo:stack` — prints suggested multi-terminal order for demos.
 - **`npm test`** — automated smoke test: starts premium API + proxy on **random ports**, checks `/health`, direct **402** + `PAYMENT-REQUIRED`, **guardrail 403** on blocked host, and `curl -x` through the proxy (200 with premium JSON if devnet settlement succeeds, otherwise 402 is still treated as OK for CI). Override ports with `SMOKE_PREMIUM_PORT` / `SMOKE_PROXY_PORT` if needed.
 - **`npm run proof:devnet`** — strict devnet proof runner. Requires funded wallet and writes evidence to `docs/proofs/devnet-proof.json`.
+- **`npm run demo:agent-flow`** — narrated curl steps: blocked 403, allowed forward, premium x402 path; see [docs/demo-agent.md](docs/demo-agent.md).
 
 The proxy listens on **`AEGIS_PROXY_PORT`** (default `8080`) and **`AEGIS_PROXY_HOST`** (default `127.0.0.1`).
 

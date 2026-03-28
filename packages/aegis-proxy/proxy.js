@@ -25,6 +25,7 @@ function resolveConfigPath() {
 }
 
 const CONFIG_PATH = resolveConfigPath();
+const PROXY_ACTIVITY_JSONL = join(homedir(), ".aegis", "proxy-activity.jsonl");
 const PORT = (() => {
   const envPort = process.env.AEGIS_PROXY_PORT ?? process.env.PORT ?? "";
   const n = Number.parseInt(envPort, 10);
@@ -156,6 +157,48 @@ function hostnameMatchesWhitelist(hostname, whitelist) {
   return false;
 }
 
+/**
+ * Keyword blocklist: match on hostname only (not full URL path).
+ * Matching on the full URL caused false positives (e.g. keyword "health" blocking /health).
+ */
+function keywordBlockHit(hostname, keywords) {
+  const h = String(hostname).toLowerCase();
+  for (const raw of keywords || []) {
+    const k = String(raw).toLowerCase().trim();
+    if (k && h.includes(k)) return k;
+  }
+  return null;
+}
+
+/**
+ * URL-layer policy: blacklist, then whitelist, then keyword on hostname.
+ * Returns { ok, reason?, keyword? }.
+ */
+function evaluateUrlPolicy(cfg, hostname) {
+  const bl = cfg.blacklist ?? [];
+  if (hostnameMatchesWhitelist(hostname, bl)) {
+    return { ok: false, reason: "host blacklisted" };
+  }
+  if (!hostnameMatchesWhitelist(hostname, cfg.whitelist ?? [])) {
+    return { ok: false, reason: "domain not whitelisted" };
+  }
+  const hit = keywordBlockHit(hostname, cfg.keyword_blocklist ?? []);
+  if (hit) {
+    return { ok: false, reason: "keyword_blocklist", keyword: hit };
+  }
+  return { ok: true };
+}
+
+async function appendProxyActivity(evt) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...evt }) + "\n";
+  try {
+    await fs.mkdir(dirname(PROXY_ACTIVITY_JSONL), { recursive: true });
+    await fs.appendFile(PROXY_ACTIVITY_JSONL, line, "utf8");
+  } catch (e) {
+    console.error("[Aegis Proxy] activity log:", e?.message ?? e);
+  }
+}
+
 function maxAmountFromPaymentRequired(pr) {
   if (!pr.accepts?.length) {
     throw new Error("PaymentRequired has no accepts");
@@ -172,14 +215,22 @@ async function checkPolicy(paymentRequired, targetUrl) {
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const config = JSON.parse(raw);
   const hostname = new URL(targetUrl).hostname;
-  if (!hostnameMatchesWhitelist(hostname, config.whitelist ?? [])) {
-    return { ok: false, reason: "domain not whitelisted" };
+  const urlEval = evaluateUrlPolicy(config, hostname);
+  if (!urlEval.ok) {
+    return { ok: false, reason: urlEval.reason, keyword: urlEval.keyword };
   }
   const amount = maxAmountFromPaymentRequired(paymentRequired);
+  const perTxCap = config.per_tx_limit_micro_usdc ?? config.per_tx_limit_lamports;
+  if (perTxCap !== undefined && perTxCap !== null && String(perTxCap).length > 0) {
+    const cap = BigInt(String(perTxCap));
+    if (amount > cap) {
+      return { ok: false, reason: "amount exceeds per-transaction limit" };
+    }
+  }
   const today = new Date().toISOString().slice(0, 10);
   const spent =
     config.last_reset_date === today ? BigInt(config.spent_today ?? "0") : BigInt(0);
-  const budget = BigInt(config.daily_budget_lamports);
+  const budget = BigInt(config.daily_budget_lamports ?? "0");
   if (spent + amount > budget) {
     return { ok: false, reason: "amount exceeds daily budget" };
   }
@@ -295,13 +346,32 @@ app.use(async (req, res) => {
 
     const raw = await fs.readFile(CONFIG_PATH, "utf8");
     const cfg = JSON.parse(raw);
-    if (!hostnameMatchesWhitelist(hostname, cfg.whitelist ?? [])) {
-      return res.status(403).json({ error: "target host not whitelisted" });
+    const urlEval = evaluateUrlPolicy(cfg, hostname);
+    if (!urlEval.ok) {
+      const reason = urlEval.reason || "policy denied";
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: reason === "host blacklisted" ? "blocked_blacklist" : reason === "keyword_blocklist" ? "blocked_keyword" : "blocked_not_whitelisted",
+        status: 403,
+        detail: urlEval.keyword ? { keyword: urlEval.keyword } : undefined,
+      });
+      return res.status(403).json({
+        error: "policy denied",
+        reason,
+        keyword: urlEval.keyword,
+      });
     }
 
     const first = await forwardOnce(targetUrl, req);
 
     if (first.status !== 402) {
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "forwarded",
+        status: first.status,
+      });
       return sendAxiosResponse(res, first);
     }
 
@@ -328,7 +398,18 @@ app.use(async (req, res) => {
 
     const policy = await checkPolicy(paymentRequired, targetUrl);
     if (!policy.ok) {
-      return res.status(403).json({ error: "policy denied", reason: policy.reason });
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "policy_denied",
+        status: 403,
+        detail: { reason: policy.reason, keyword: policy.keyword },
+      });
+      return res.status(403).json({
+        error: "policy denied",
+        reason: policy.reason,
+        keyword: policy.keyword,
+      });
     }
 
     const paymentPayload = await httpClient.createPaymentPayload(paymentRequired);
@@ -352,11 +433,29 @@ app.use(async (req, res) => {
 
     if (retry.status === 200) {
       await persistSpendAfterSuccess(policy.amountLamports);
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "paid_success",
+        status: 200,
+      });
+    } else {
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "payment_retry_non_200",
+        status: retry.status,
+      });
     }
 
     return sendAxiosResponse(res, retry);
   } catch (err) {
     console.error("[Aegis Proxy] Error:", err?.message ?? err);
+    await appendProxyActivity({
+      outcome: "error",
+      status: 500,
+      detail: String(err?.message ?? err),
+    });
     return res.status(500).json({ error: "proxy error" });
   }
 });
