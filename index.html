@@ -3,30 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <title>Aegis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+    }
+    #root {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
 
     :root {
-      --bg:      #0a0a12;
-      --card:    #12121e;
-      --sidebar: #0e0e1a;
-      --border:  rgba(255,255,255,0.07);
-      --blue:    #3b82f6;
-      --green:   #10b981;
-      --red:     #ef4444;
-      --amber:   #f59e0b;
-      --text:    #e2e8f0;
+      --bg:      #060608;
+      --card:    #0c0c10;
+      --sidebar: #08080c;
+      --border:  rgba(255,255,255,0.065);
+      --blue:    #5b9dc9;
+      --accent:  #5b9dc9;
+      --accent-soft: rgba(91, 157, 201, 0.09);
+      /* Default semantic (sidebar dots, etc.) */
+      --green:   #4f7d72;
+      --red:     #a65d5d;
+      --amber:   #9a7349;
+      /* Muted UI accents — traffic tiles, pills, stack status (institutional, low-chroma) */
+      --signal-danger:     #a88484;
+      --signal-danger-edge: rgba(152, 118, 118, 0.55);
+      --signal-danger-fill: rgba(152, 118, 118, 0.08);
+      --signal-ok:         #8a9e94;
+      --signal-ok-edge:    rgba(120, 145, 135, 0.5);
+      --signal-ok-fill:    rgba(120, 145, 135, 0.1);
+      --signal-forward:    #7c8794;
+      --signal-forward-edge: rgba(110, 122, 136, 0.45);
+      --signal-forward-fill: rgba(110, 122, 136, 0.07);
+      --text:    #e8eaed;
       --muted:   #64748b;
-      --dim:     #44445a;
-      --mono:    'SF Mono', 'Fira Code', Consolas, monospace;
-      --dot-bg:  radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px) 24px 24px;
+      --dim:     #525a66;
+      --sub:     #8b95a3;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:    'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
     }
 
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: var(--font-sans);
       font-size: 13px;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
       height: 100vh;
       overflow: hidden;
       display: flex;
@@ -53,11 +85,12 @@
       color: #fff;
     }
     .sidebar-logo-sub {
-      font-size: 11px;
-      color: var(--dim);
-      letter-spacing: 0.08em;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      margin-top: 3px;
+      margin-top: 4px;
+      font-weight: 500;
     }
     .nav-section-label {
       font-size: 11px;
@@ -80,14 +113,14 @@
     }
     .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.025); }
     .nav-item.active {
-      color: var(--blue);
-      border-left-color: var(--blue);
-      background: rgba(59,130,246,0.06);
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-soft);
     }
     .nav-badge {
       margin-left: auto;
-      background: rgba(245,158,11,0.18);
-      color: var(--amber);
+      background: rgba(154, 123, 85, 0.14);
+      color: #a08262;
       border-radius: 999px;
       font-size: 10px;
       padding: 1px 7px;
@@ -105,18 +138,14 @@
       color: var(--muted);
     }
     .status-dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--green);
       flex-shrink: 0;
-      animation: pulse-green 2s ease-in-out infinite;
+      box-shadow: 0 0 0 1px rgba(79, 125, 114, 0.4);
     }
-    .status-dot.offline { background: var(--dim); animation: none; }
-    @keyframes pulse-green {
-      0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
-      50%      { box-shadow: 0 0 0 4px rgba(16,185,129,0); }
-    }
+    .status-dot.offline { background: var(--dim); box-shadow: none; }
     .status-key {
       margin-top: 5px;
       font-size: 11px;
@@ -126,70 +155,432 @@
     }
 
     /* ── MAIN ── */
-    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     .topbar {
       padding: 14px 28px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 20px;
       background: var(--sidebar);
       flex-shrink: 0;
+      width: 100%;
     }
-    .topbar-title { font-size: 13px; font-weight: 500; color: var(--text); }
-    .topbar-status { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+    .topbar-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .topbar-actions .btn { flex-shrink: 0; }
+    .topbar-pubkey {
+      font-size: 12px;
+      font-family: var(--font-sans);
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      min-width: 7.25rem;
+      text-align: right;
+    }
+    .topbar-pubkey--empty {
+      min-width: 0;
+      width: 0;
+      overflow: hidden;
+      padding: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .topbar-status {
+      font-size: 12px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      min-width: 12.5rem;
+      text-align: right;
+    }
     .topbar-warn { color: var(--amber); }
-    .content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+    .content {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px 28px;
+    }
+    .content > * {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
 
     /* ── CARDS ── */
     .card {
       background: var(--card);
-      background-image: var(--dot-bg);
-      background-color: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      transition: border-color 0.15s;
+      border-radius: 10px;
+      padding: 22px 24px;
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1);
     }
-    .card:hover { border-color: rgba(59,130,246,0.22); }
-    .card + .card { margin-top: 16px; }
+    .card:hover { border-color: rgba(255,255,255,0.1); }
+    .card + .card { margin-top: 14px; }
+    .overview-kpi-grid > .card { min-width: 0; }
+
+    /* Policy tab — single surface, flat sections (no nested cards) */
+    .policy-page {
+      width: 100%;
+      max-width: 100%;
+    }
+    .policy-page__surface {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 28px 28px;
+    }
+    .policy-page__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .policy-page__lead {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0 0 22px 0;
+      max-width: 56rem;
+    }
+    .policy-section {
+      margin: 0;
+      padding: 0;
+    }
+    .policy-section + .policy-section {
+      margin-top: 32px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    .policy-h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #f1f5f9;
+      margin: 0 0 10px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-family: var(--font-sans);
+    }
+    .policy-h3 {
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      text-transform: none;
+      color: #cbd5e1;
+      margin: 24px 0 8px 0;
+      font-family: var(--font-sans);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .policy-h3::before {
+      content: '';
+      width: 2px;
+      height: 0.85em;
+      border-radius: 1px;
+      background: rgba(71, 85, 105, 0.75);
+      flex-shrink: 0;
+    }
+    .policy-h3:first-child { margin-top: 0; }
+    .policy-note {
+      font-size: 12px;
+      color: var(--dim);
+      line-height: 1.5;
+      margin: 0 0 16px 0;
+      max-width: 56rem;
+    }
+    .policy-readout {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+    .policy-readout__caption {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 10px 0;
+    }
+    .policy-readout__path {
+      font-size: 11px;
+      color: var(--dim);
+      font-family: var(--mono);
+      word-break: break-all;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+    .policy-kv-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--font-sans);
+    }
+    .policy-kv-table th {
+      text-align: left;
+      color: var(--dim);
+      font-weight: 500;
+      padding: 5px 14px 5px 0;
+      vertical-align: top;
+      width: 10.5rem;
+    }
+    .policy-kv-table td {
+      color: var(--muted);
+      padding: 5px 0;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .policy-readout__actions {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .policy-missing {
+      border: 1px dashed rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* App & dashboard — neutral grouping (no semantic color coding on Policy) */
+    .policy-budget-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .policy-budget-cell {
+      padding: 12px 14px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .policy-budget-cell:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .policy-pair-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+    .policy-field-slab {
+      border-radius: 10px;
+      padding: 14px 16px 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      border-left: 2px solid rgba(71, 85, 105, 0.5);
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .policy-field-slab:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+    }
+    .policy-field-slab .form-group { margin-bottom: 0; }
+    .policy-field-slab .form-textarea { min-height: 88px; }
 
     /* ── GRIDS ── */
-    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 16px; }
+    /* Overview KPI row: always four equal columns (Activity tab uses the same type scale). */
+    .overview-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+      width: 100%;
+    }
+    @media (max-width: 640px) {
+      .overview-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
     .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 
     /* ── STAT CARDS ── */
+    /* Match Activity tab: Inter + tabular nums for figures (see .a-amt / .a-url). */
     .stat-label {
       font-size: 11px;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.09em;
       color: var(--muted);
       margin-bottom: 10px;
     }
     .stat-value {
-      font-family: Georgia, 'Times New Roman', serif;
+      font-family: var(--font-sans);
       font-size: 28px;
-      color: #fff;
-      line-height: 1;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #f8fafc;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
     }
     .stat-sub {
-      margin-top: 7px;
-      font-size: 11px;
+      margin-top: 8px;
+      font-size: 12px;
       color: var(--muted);
-      font-family: var(--mono);
+      font-family: var(--font-sans);
+      line-height: 1.4;
+      font-weight: 400;
     }
+    .stat-value--text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    /* ── PROXY ACTIVITY STRIP (Overview) ── */
+    .proxy-metric-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+      width: 100%;
+    }
+    @media (max-width: 720px) {
+      .proxy-metric-strip { grid-template-columns: 1fr; }
+    }
+    .proxy-metric {
+      border-radius: 10px;
+      padding: 14px 14px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-left-width: 2px;
+    }
+    .proxy-metric--blocked { border-left-color: var(--signal-danger-edge); background: var(--signal-danger-fill); }
+    .proxy-metric--forward { border-left-color: var(--signal-forward-edge); background: var(--signal-forward-fill); }
+    .proxy-metric--paid   { border-left-color: var(--signal-ok-edge); background: var(--signal-ok-fill); }
+    .proxy-metric-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: var(--font-sans);
+    }
+    .proxy-metric-num {
+      font-family: var(--font-sans);
+      font-size: 28px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      color: #f8fafc;
+      letter-spacing: -0.01em;
+    }
+    .proxy-metric-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      font-weight: 400;
+      font-family: var(--font-sans);
+    }
+
+    /* ── LOCAL STACK STATUS ── */
+    .stack-run-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .stack-run-tile {
+      border-radius: 10px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .stack-run-tile.is-live {
+      border-color: rgba(120, 145, 135, 0.28);
+      background: var(--signal-ok-fill);
+    }
+    .stack-run-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--sub);
+      margin-bottom: 6px;
+    }
+    .stack-run-state {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      font-family: var(--font-sans);
+      line-height: 1.4;
+    }
+    .stack-run-state.on { color: var(--signal-ok); }
+    .stack-run-state.off { color: var(--muted); }
+    .stack-health-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 20px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .stack-health-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--sub);
+      margin-right: 4px;
+    }
+    .stack-health-item {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stack-health-item .hl-name { color: var(--muted); font-weight: 500; margin-right: 6px; }
+    .stack-health-item .hl-ok { color: var(--signal-ok); }
+    .stack-health-item .hl-wait { color: var(--dim); font-weight: 500; }
 
     /* ── BUDGET BARS ── */
     .budget-row { margin-bottom: 14px; }
     .budget-row:last-child { margin-bottom: 0; }
     .budget-hdr { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
     .budget-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
-    .budget-nums { font-size: 12px; font-family: var(--mono); color: var(--text); }
+    .budget-nums { font-size: 12px; font-family: inherit; font-variant-numeric: tabular-nums; color: var(--text); }
     .budget-track { height: 3px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; }
-    .budget-fill { height: 100%; border-radius: 999px; background: var(--blue); transition: width 0.5s ease; }
-    .budget-fill.warn   { background: var(--amber); }
-    .budget-fill.danger { background: var(--red); }
+    .budget-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.5s ease; }
+    .budget-fill.warn   { background: rgba(154, 123, 85, 0.85); }
+    .budget-fill.danger { background: rgba(152, 118, 118, 0.9); }
 
     /* ── PILLS ── */
     .pill {
@@ -201,10 +592,10 @@
       font-weight: 500;
       white-space: nowrap;
     }
-    .pill-approved { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.22); color: var(--green); }
-    .pill-blocked  { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.22);  color: var(--red);   }
-    .pill-pending  { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.22); color: var(--amber); }
-    .pill-active   { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.22); color: var(--green); }
+    .pill-approved { background: var(--signal-ok-fill); border: 1px solid rgba(120, 145, 135, 0.28); color: var(--signal-ok); }
+    .pill-blocked  { background: var(--signal-danger-fill); border: 1px solid rgba(152, 118, 118, 0.28); color: var(--signal-danger); }
+    .pill-pending  { background: rgba(154, 123, 85, 0.09); border: 1px solid rgba(154, 123, 85, 0.22); color: #a08262; }
+    .pill-active   { background: var(--signal-forward-fill); border: 1px solid rgba(110, 122, 136, 0.28); color: var(--signal-forward); }
 
     /* ── ACTIVITY TABLE ── */
     .activity-table { width: 100%; border-collapse: collapse; }
@@ -213,9 +604,9 @@
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.09em;
-      color: var(--dim);
+      color: var(--muted);
       padding-bottom: 10px;
-      font-weight: 400;
+      font-weight: 600;
       border-bottom: 1px solid var(--border);
     }
     .activity-th.right { text-align: right; }
@@ -228,26 +619,62 @@
       to   { opacity: 1; transform: translateY(0); }
     }
     .activity-row.pending-row {
-      border-left: 3px solid var(--amber);
-      background: rgba(245,158,11,0.03);
+      border-left: 2px solid rgba(154, 123, 85, 0.45);
+      background: rgba(154, 123, 85, 0.04);
       animation: slide-in 0.2s ease, pulse-border 2s ease-in-out infinite;
     }
     @keyframes pulse-border {
-      0%,100% { border-left-color: rgba(245,158,11,0.35); }
-      50%      { border-left-color: rgba(245,158,11,1); }
+      0%,100% { border-left-color: rgba(154, 123, 85, 0.35); }
+      50%      { border-left-color: rgba(154, 123, 85, 0.55); }
     }
     .activity-row td { padding: 13px 10px; vertical-align: top; }
     .activity-row td:first-child { padding-left: 2px; }
-    .a-url   { font-family: var(--mono); font-size: 12px; color: var(--text); }
-    .a-amt   { font-family: var(--mono); font-size: 12px; text-align: right; white-space: nowrap; }
-    .a-time  { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
-    .a-sig   { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 3px; }
+    .a-url   {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .a-amt   {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+      color: var(--sub);
+    }
+    .a-time  {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .a-sig   {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--dim);
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+    }
+    .a-source {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      vertical-align: middle;
+    }
     .pending-expand {
       padding-top: 12px;
-      border-top: 1px solid rgba(245,158,11,0.12);
+      border-top: 1px solid rgba(154, 123, 85, 0.15);
       margin-top: 10px;
     }
-    .pending-detail { font-size: 12px; font-family: var(--mono); color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
+    .pending-detail { font-size: 12px; font-family: inherit; color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
 
     /* ── BUTTONS ── */
     .btn {
@@ -258,21 +685,21 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.13s;
+      transition: background 0.18s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.18s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.18s ease, transform 0.12s cubic-bezier(0.25, 1, 0.5, 1);
       border: none;
       padding: 8px 20px;
       font-family: inherit;
     }
-    .btn-primary  { background: var(--blue);  color: #fff; }
-    .btn-primary:hover  { background: #2563eb; }
+    .btn-primary  { background: var(--accent);  color: #0a0a0c; font-weight: 600; }
+    .btn-primary:hover  { background: #7eb8e0; }
     .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-outline  { background: transparent; border: 1px solid var(--border); color: var(--text); }
     .btn-outline:hover  { border-color: rgba(255,255,255,0.18); }
-    .btn-approve  { background: rgba(16,185,129,0.14); border: 1px solid rgba(16,185,129,0.28); color: var(--green); padding: 5px 14px; font-size: 12px; }
-    .btn-approve:hover  { background: rgba(16,185,129,0.24); }
+    .btn-approve  { background: var(--signal-ok-fill); border: 1px solid rgba(120, 145, 135, 0.35); color: var(--signal-ok); padding: 5px 14px; font-size: 12px; font-weight: 500; }
+    .btn-approve:hover  { background: rgba(120, 145, 135, 0.16); }
     .btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-deny     { background: transparent; border: 1px solid rgba(239,68,68,0.28); color: var(--red); padding: 5px 14px; font-size: 12px; }
-    .btn-deny:hover     { background: rgba(239,68,68,0.08); }
+    .btn-deny     { background: transparent; border: 1px solid rgba(152, 118, 118, 0.35); color: var(--signal-danger); padding: 5px 14px; font-size: 12px; font-weight: 500; }
+    .btn-deny:hover     { background: var(--signal-danger-fill); }
 
     /* ── INPUTS ── */
     .form-group { margin-bottom: 18px; }
@@ -294,13 +721,26 @@
       font-size: 13px;
       padding: 9px 12px;
       outline: none;
-      transition: border-color 0.13s, box-shadow 0.13s;
-      font-family: var(--mono);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      font-family: var(--font-sans);
+      font-variant-numeric: tabular-nums;
     }
     .form-input::placeholder, .form-textarea::placeholder { color: var(--dim); }
+    .form-input:hover, .form-textarea:hover {
+      border-color: rgba(255,255,255,0.14);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
+      background: #18182a;
+    }
     .form-input:focus, .form-textarea:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+      border-color: rgba(100, 130, 165, 0.65);
+      box-shadow: 0 0 0 2px rgba(80, 110, 145, 0.28);
+      background: #18182a;
+    }
+    /* Policy page: inputs stay fully neutral (no cool tint on focus) */
+    .policy-page .form-input:focus,
+    .policy-page .form-textarea:focus {
+      border-color: rgba(255,255,255,0.22);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.06);
     }
     .form-textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
     .form-hint { font-size: 11px; color: var(--dim); margin-top: 4px; }
@@ -317,7 +757,14 @@
 
     /* ── SECTION HEADER ── */
     .sec-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+    .sec-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      font-family: var(--font-sans);
+    }
 
     /* ── KEY STATUS ROWS ── */
     .ks-row {
@@ -329,7 +776,7 @@
     }
     .ks-row:last-child { border-bottom: none; }
     .ks-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
-    .ks-val   { font-size: 12px; font-family: var(--mono); color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .ks-val   { font-size: 12px; font-family: inherit; color: var(--text); display: flex; align-items: center; gap: 8px; }
 
     /* ── COPY BTN ── */
     .copy-btn {
@@ -344,7 +791,7 @@
       transition: all 0.13s;
     }
     .copy-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
-    .copy-btn.copied { border-color: rgba(16,185,129,0.3); color: var(--green); }
+    .copy-btn.copied { border-color: rgba(120, 145, 135, 0.35); color: var(--signal-ok); }
 
     /* ── EMPTY STATE ── */
     .empty { text-align: center; padding: 52px 24px; color: var(--muted); }
@@ -353,8 +800,8 @@
 
     /* ── ALERT BANNER ── */
     .alert-banner {
-      background: rgba(245,158,11,0.07);
-      border: 1px solid rgba(245,158,11,0.2);
+      background: rgba(154, 123, 85, 0.07);
+      border: 1px solid rgba(154, 123, 85, 0.22);
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 16px;
@@ -362,7 +809,7 @@
       align-items: center;
       gap: 10px;
       font-size: 13px;
-      color: var(--amber);
+      color: #a08262;
     }
 
     /* ── MISC ── */
@@ -370,6 +817,7 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
     .mono { font-family: var(--mono); }
+    pre { font-family: var(--mono); }
     hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
 
     /* ── SPINNER ── */
@@ -382,10 +830,35 @@
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
     }
+    .btn-primary .spinner {
+      border: 2px solid rgba(10,10,12,0.2);
+      border-top-color: #0a0a0c;
+    }
 
     /* ── SUCCESS/ERROR TOASTS ── */
-    .toast-ok  { padding: 10px 14px; background: rgba(16,185,129,0.08);  border: 1px solid rgba(16,185,129,0.2);  border-radius: 8px; font-size: 12px; color: var(--green); font-family: var(--mono); margin-bottom: 14px; }
-    .toast-err { padding: 10px 14px; background: rgba(239,68,68,0.08);   border: 1px solid rgba(239,68,68,0.2);   border-radius: 8px; font-size: 12px; color: var(--red);   font-family: var(--mono); margin-bottom: 14px; }
+    .toast-ok  { padding: 10px 14px; background: var(--signal-ok-fill);  border: 1px solid rgba(120, 145, 135, 0.22);  border-radius: 8px; font-size: 12px; color: var(--signal-ok); font-family: inherit; margin-bottom: 14px; }
+    .toast-err { padding: 10px 14px; background: var(--signal-danger-fill);   border: 1px solid rgba(152, 118, 118, 0.22);   border-radius: 8px; font-size: 12px; color: var(--signal-danger);   font-family: inherit; margin-bottom: 14px; }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.985);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn,
+      .card,
+      .policy-field-slab,
+      .policy-budget-cell,
+      .form-input,
+      .form-textarea,
+      .nav-item,
+      .stack-run-tile,
+      .copy-btn {
+        transition-duration: 0.01ms !important;
+      }
+      .btn:active:not(:disabled) { transform: none; }
+      .activity-row { animation: none !important; }
+      .spinner { animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -480,9 +953,9 @@
           <div className="budget-hdr">
             <span className="budget-name">{label}</span>
             <span className="budget-nums">
-              <span className="mono">${spent.toFixed(2)}</span>
-              <span style={{color:'#44445a'}}> / </span>
-              <span className="mono">${total.toFixed(2)}</span>
+              <span>${spent.toFixed(2)}</span>
+              <span style={{color:'var(--dim)'}}> / </span>
+              <span>${total.toFixed(2)}</span>
             </span>
           </div>
           <div className="budget-track">
@@ -509,7 +982,7 @@
       </div>
     );
 
-    // ── LOCAL STACK (backend) ─────────────────────────────────────────────────
+    // ── LOCAL STACK ───────────────────────────────────────────────────────────
     const defaultStackPorts = { proxy: 8080, premium: 9090 };
     const LocalStackCard = ({
       stackPorts,
@@ -526,20 +999,21 @@
       onClearLogs,
       onRunSmoke,
       onRunProof,
-    }) => (
+    }) => {
+      const proxyOn = !!(stackStatus && stackStatus.proxyRunning);
+      const premOn = !!(stackStatus && stackStatus.premiumRunning);
+      const premHl = !!(healthPremium && healthPremium.ok);
+      const proxyHl = !!(healthProxy && healthProxy.ok);
+      return (
       <div className="card" style={{marginBottom:'16px'}}>
         <div className="sec-hdr">
-          <span className="sec-title">Local stack (backend)</span>
+          <span className="sec-title">Local stack</span>
           <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
             <button className="btn btn-outline" onClick={onClearLogs} type="button">Clear logs</button>
             <button className="btn btn-outline" onClick={onStop} disabled={!stackStatus || (!stackStatus.proxyRunning && !stackStatus.premiumRunning)} type="button">Stop</button>
             <button className="btn btn-primary" onClick={onStart} disabled={!!(stackStatus && stackStatus.proxyRunning)} type="button">Start</button>
           </div>
         </div>
-        <p style={{fontSize:'12px', color:'var(--muted)', marginBottom:'14px', lineHeight:1.5}}>
-          Runs premium API and the Aegis x402 proxy. If you have provisioned a wallet, <strong>Start</strong> passes that key to the proxy in memory (same pubkey as the app). Otherwise use <span className="mono">AEGIS_PRIVATE_KEY_BASE58</span> in repo-root <span className="mono">.env</span> (loaded on app launch).
-          Proxy policy: <span className="mono">~/.aegis/proxy-policy.json</span> — synced when you save Policy.
-        </p>
         <div className="grid-2" style={{marginBottom:'12px'}}>
           <div className="form-group">
             <label className="form-label">Proxy port</label>
@@ -556,13 +1030,28 @@
               disabled={!!(stackStatus && stackStatus.proxyRunning)}/>
           </div>
         </div>
-        <div style={{fontSize:'12px', fontFamily:'var(--mono)', color:'var(--muted)', marginBottom:'10px'}}>
-          {(stackStatus && stackStatus.proxyRunning) ? <span style={{color:'var(--green)'}}>● Proxy running</span> : <span>○ Proxy stopped</span>}
-          <span style={{margin:'0 12px'}}>|</span>
-          {(stackStatus && stackStatus.premiumRunning) ? <span style={{color:'var(--green)'}}>● Premium API running</span> : <span>○ Premium stopped</span>}
-        </div>
-        <div style={{fontSize:'12px', fontFamily:'var(--mono)', color:'var(--muted)', marginBottom:'12px'}}>
-          Health — Premium: {(healthPremium && healthPremium.ok) ? 'ok' : '—'} · Proxy: {(healthProxy && healthProxy.ok) ? 'ok' : '—'}
+        <div>
+          <div className="stack-run-grid">
+            <div className={'stack-run-tile' + (proxyOn ? ' is-live' : '')}>
+              <div className="stack-run-kicker">Proxy</div>
+              <div className={'stack-run-state ' + (proxyOn ? 'on' : 'off')}>{proxyOn ? 'Running' : 'Stopped'}</div>
+            </div>
+            <div className={'stack-run-tile' + (premOn ? ' is-live' : '')}>
+              <div className="stack-run-kicker">Premium API</div>
+              <div className={'stack-run-state ' + (premOn ? 'on' : 'off')}>{premOn ? 'Running' : 'Stopped'}</div>
+            </div>
+          </div>
+          <div className="stack-health-bar">
+            <span className="stack-health-kicker">Health</span>
+            <span className="stack-health-item">
+              <span className="hl-name">Premium</span>
+              {premHl ? <span className="hl-ok">OK</span> : <span className="hl-wait">Not checked</span>}
+            </span>
+            <span className="stack-health-item">
+              <span className="hl-name">Proxy</span>
+              {proxyHl ? <span className="hl-ok">OK</span> : <span className="hl-wait">Not checked</span>}
+            </span>
+          </div>
         </div>
         <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Process logs</span></div>
         <pre style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px', fontSize:'11px', maxHeight:'160px', overflow:'auto', whiteSpace:'pre-wrap', wordBreak:'break-all', color:'var(--muted)'}}>
@@ -584,22 +1073,33 @@
           </div>
         ) : null}
       </div>
-    );
+      );
+    };
 
     // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
     const OverviewTab = ({ stats, walletStatus, pendingCount, localStack, proxyOverview }) => (
-      <div>
+      <div style={{width:'100%', maxWidth:'100%'}}>
         {localStack}
         {proxyOverview && (
           <div className="card" style={{marginBottom:'16px'}}>
-            <div className="sec-hdr"><span className="sec-title">Proxy activity (today)</span></div>
-            <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.6, margin:0}}>
-              Blocked: <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.blockedCount}</span>
-              {' · '}
-              Forwards (non-402): <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.forwardedCount}</span>
-              {' · '}
-              Paid (x402 success): <span className="mono" style={{color:'var(--text)'}}>{proxyOverview.paidCount}</span>
-            </p>
+            <div className="sec-hdr"><span className="sec-title">Today’s traffic</span></div>
+            <div className="proxy-metric-strip">
+              <div className="proxy-metric proxy-metric--blocked">
+                <div className="proxy-metric-kicker">Blocked</div>
+                <div className="proxy-metric-num">{proxyOverview.blockedCount}</div>
+                <div className="proxy-metric-hint">Stopped by your rules</div>
+              </div>
+              <div className="proxy-metric proxy-metric--forward">
+                <div className="proxy-metric-kicker">Forwarded</div>
+                <div className="proxy-metric-num">{proxyOverview.forwardedCount}</div>
+                <div className="proxy-metric-hint">Allowed without a payment</div>
+              </div>
+              <div className="proxy-metric proxy-metric--paid">
+                <div className="proxy-metric-kicker">Paid</div>
+                <div className="proxy-metric-num">{proxyOverview.paidCount}</div>
+                <div className="proxy-metric-hint">Completed paid requests</div>
+              </div>
+            </div>
           </div>
         )}
         {pendingCount > 0 && (
@@ -608,7 +1108,7 @@
             <span>{pendingCount} transaction{pendingCount > 1 ? 's' : ''} awaiting your approval — go to Activity</span>
           </div>
         )}
-        <div className="grid-4" style={{marginBottom:'16px'}}>
+        <div className="overview-kpi-grid">
           <div className="card">
             <div className="stat-label">Spent Today</div>
             <div className="stat-value">${stats ? stats.spentTodayUSDC.toFixed(2) : '0.00'}</div>
@@ -626,10 +1126,10 @@
           </div>
           <div className="card">
             <div className="stat-label">Agent Status</div>
-            <div className="stat-value" style={{fontSize:'16px', fontFamily:'inherit', marginTop:'8px'}}>
+            <div className="stat-value stat-value--text">
               {walletStatus && walletStatus.provisioned
-                ? <span style={{color:'var(--green)'}}>Active</span>
-                : <span style={{color:'var(--dim)'}}>Not Provisioned</span>}
+                ? <span style={{color:'var(--signal-ok)'}}>Active</span>
+                : <span style={{color:'var(--dim)', fontWeight:600}}>Not set up</span>}
             </div>
             <div className="stat-sub" style={{wordBreak:'break-all'}}>
               {walletStatus && walletStatus.publicKey
@@ -640,10 +1140,7 @@
         </div>
 
         <div className="card">
-          <div className="sec-hdr"><span className="sec-title">Budget Utilization (wallet / HITL)</span></div>
-          <p style={{fontSize:'11px', color:'var(--dim)', marginBottom:'12px', lineHeight:1.5}}>
-            Bars combine <strong>HITL</strong> spend (this app) with <strong>x402</strong> totals from the proxy log (rolling 7d / 30d for weekly/monthly). Daily matches <span className="mono">~/.aegis/proxy-policy.json</span> spend caps.
-          </p>
+          <div className="sec-hdr"><span className="sec-title">Budget utilization</span></div>
           {stats
             ? <div>
                 <BudgetBar label="Daily"   spent={stats.spentTodayUSDC} total={stats.dailyBudgetUSDC}/>
@@ -725,7 +1222,7 @@
         <div className="card">
           <div className="sec-hdr">
             <span className="sec-title">Transaction Log</span>
-            <span style={{fontSize:'11px', color:'var(--dim)', fontFamily:'monospace'}}>{allRows.length} entries</span>
+            <span style={{fontSize:'12px', color:'var(--muted)', fontFamily:'inherit', fontWeight:500}}>{allRows.length} entries</span>
           </div>
           <table className="activity-table">
             <thead>
@@ -740,7 +1237,7 @@
             <tbody>
               {allRows.map((row, i) => (
                 <tr key={row.id || i} className={`activity-row ${row._pending ? 'pending-row' : ''}`}>
-                  <td className="a-time" style={{fontSize:'11px', color:'var(--dim)'}}>{row._proxy ? 'Proxy' : 'Wallet'}</td>
+                  <td className="a-source">{row._proxy ? 'Proxy' : 'Wallet'}</td>
                   <td style={{paddingTop: row._pending ? '14px' : undefined}}>
                     <StatusPill status={row._pending ? 'PENDING' : row.status}/>
                   </td>
@@ -750,7 +1247,7 @@
                     {row._pending && (
                       <div className="pending-expand">
                         <div className="pending-detail">
-                          Amount: <span style={{color:'var(--amber)'}}>${parseFloat(row.amount||0).toFixed(2)} USDC</span><br/>
+                          Amount: <span style={{color:'#9a7b55'}}>${parseFloat(row.amount||0).toFixed(2)} USDC</span><br/>
                           To: {row.recipient || '—'}
                         </div>
                         <div style={{display:'flex', gap:'8px'}}>
@@ -769,7 +1266,7 @@
                       <div className="a-sig">tx: {row.signature.slice(0,14)}…</div>
                     )}
                   </td>
-                  <td className="a-amt" style={{color: row._pending ? 'var(--amber)' : undefined}}>
+                  <td className="a-amt" style={{color: row._pending ? '#9a7b55' : undefined}}>
                     ${parseFloat(row.amount||0).toFixed(2)}
                   </td>
                   <td className="a-time">{fmt(row.timestamp)}</td>
@@ -879,118 +1376,156 @@
       };
 
       return (
-        <div className="card">
-          <div className="sec-hdr" style={{marginBottom:'4px'}}>
-            <span className="sec-title">Agent Policy Rules</span>
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? <span className="spinner"/> : saved ? '✓ Saved' : 'Save Policy'}
-            </button>
-          </div>
-          <p style={{fontSize:'12px', color:'var(--muted)', lineHeight:1.55, marginBottom:'16px'}}>
-            <strong style={{color:'var(--text)'}}>HTTP proxy (stack running):</strong> URL allow/block lists, keyword hostname blocklist, daily + per-tx caps, and Solana <span className="mono">payTo</span> allow/deny — written to <span className="mono">~/.aegis/proxy-policy.json</span>.
-            <br/>
-            <strong style={{color:'var(--text)'}}>This app only:</strong> weekly/monthly budgets, auto-approve threshold (for future HITL automation), program IDs, token mints, and prompt text — saved in <span className="mono">~/.aegis/config.json</span> for agents / tooling.
-          </p>
-
-          {proxyPolicy && proxyPolicy.exists === false && (
-            <div style={{border:'1px dashed var(--border)', borderRadius:'8px', padding:'12px', marginBottom:'16px'}}>
-              <p style={{fontSize:'12px', color:'var(--muted)', margin:0}}>Save Policy once to create <span className="mono">~/.aegis/proxy-policy.json</span> (URL firewall + x402 caps).</p>
+        <div className="policy-page">
+          <div className="policy-page__surface">
+            <div className="policy-page__head">
+              <span className="sec-title" style={{marginBottom:0}}>Policy rules</span>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? <span className="spinner"/> : saved ? '✓ Saved' : 'Save policy'}
+              </button>
             </div>
-          )}
-          {proxyPolicy && proxyPolicy.exists && (
-            <div style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'14px', marginBottom:'16px'}}>
-              <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Effective proxy policy (on disk)</span></div>
-              <p style={{fontSize:'11px', color:'var(--dim)', lineHeight:1.5, marginBottom:'10px'}}>
-                After HTTP 402, the proxy signs x402 requirements and retries with <span className="mono">PAYMENT-SIGNATURE</span>.
+            <p className="policy-page__lead">
+              Saves to <span className="mono">config.json</span>, syncs enforcement to <span className="mono">~/.aegis/proxy-policy.json</span>. Restart the <strong>local stack</strong> on Overview so the proxy reloads policy from disk.
+            </p>
+
+            <section className="policy-section">
+              <h2 className="policy-h2">Proxy enforcement</h2>
+              <p className="policy-note">
+                Applied to each request while the stack runs: URL allow/deny, hostname keywords, x402 spend caps, and optional <span className="mono">payTo</span> filters.
               </p>
-              <p style={{fontSize:'10px', color:'var(--dim)', fontFamily:'var(--mono)', wordBreak:'break-all', marginBottom:'10px'}}>{proxyPolicy.path}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>URL whitelist</strong>: {(proxyPolicy.whitelist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>URL blacklist</strong>: {(proxyPolicy.blacklist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Hostname keywords</strong>: {(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>payTo allowlist</strong> (empty = any): {(proxyPolicy.recipient_allowlist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>payTo denylist</strong>: {(proxyPolicy.recipient_denylist || []).join(', ') || '—'}</p>
-              <p style={{fontSize:'11px', color:'var(--muted)', margin:'4px 0'}}><strong>Proxy daily cap (micro-USDC)</strong>: {String(proxyPolicy.daily_budget_micro_usdc || '')}</p>
-              <div style={{marginTop:'12px', display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center'}}>
-                <button type="button" className="btn btn-outline" onClick={runProbe}>Probe non-whitelisted host</button>
-                {probeMsg ? <span style={{fontSize:'11px', fontFamily:'var(--mono)', color:'var(--muted)'}}>{probeMsg}</span> : null}
+
+              {proxyPolicy && proxyPolicy.exists === false && (
+                <div className="policy-missing">
+                  Save once to create <span className="mono">~/.aegis/proxy-policy.json</span>.
+                </div>
+              )}
+
+              {proxyPolicy && proxyPolicy.exists && (
+                <div className="policy-readout">
+                  <div className="policy-readout__caption">Effective policy on disk</div>
+                  <p className="policy-note" style={{marginBottom:'10px'}}>
+                    On HTTP 402 the proxy signs and retries with <span className="mono">PAYMENT-SIGNATURE</span>.
+                  </p>
+                  <div className="policy-readout__path">{proxyPolicy.path}</div>
+                  <table className="policy-kv-table">
+                    <tbody>
+                      <tr><th>URL whitelist</th><td>{(proxyPolicy.whitelist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>URL blacklist</th><td>{(proxyPolicy.blacklist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>Hostname keywords</th><td>{(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>payTo allowlist</th><td>{(proxyPolicy.recipient_allowlist || []).join(', ') || '—'} <span style={{color:'var(--dim)'}}>(empty = any)</span></td></tr>
+                      <tr><th>payTo denylist</th><td>{(proxyPolicy.recipient_denylist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>Daily cap (µUSDC)</th><td>{String(proxyPolicy.daily_budget_micro_usdc || '')}</td></tr>
+                    </tbody>
+                  </table>
+                  <div className="policy-readout__actions">
+                    <button type="button" className="btn btn-outline" onClick={runProbe}>Probe non-whitelisted host</button>
+                    {probeMsg ? <span style={{fontSize:'12px', color:'var(--muted)'}}>{probeMsg}</span> : null}
+                  </div>
+                </div>
+              )}
+
+              <h3 className="policy-h3">x402 spend caps (proxy)</h3>
+              <p className="form-hint" style={{marginBottom:'14px'}}>Micro-USDC units, consistent with on-chain amounts. Per-tx enforced before signing; daily cap after settlement.</p>
+              <div className="grid-2">
+                <div className="form-group"><label className="form-label">Daily budget (USDC)</label>{I('dailyBudget','number')}</div>
+                <div className="form-group"><label className="form-label">Per-transaction limit (USDC)</label>{I('perTxLimit','number')}</div>
               </div>
-            </div>
-          )}
 
-          <p className="form-section">Spend &amp; x402 caps (proxy)</p>
-          <p className="form-hint" style={{marginBottom:'14px'}}>
-            Daily and per-tx limits sync to the proxy for x402 (micro-USDC). Weekly/monthly are tracked in this app for Overview bars — restart stack after Save if caps changed.
-          </p>
-          <div className="grid-3">
-            <div className="form-group"><label className="form-label">Daily Budget (USDC)</label>{I('dailyBudget','number')}</div>
-            <div className="form-group"><label className="form-label">Weekly Budget (USDC)</label>{I('weeklyBudget','number')}</div>
-            <div className="form-group"><label className="form-label">Monthly Budget (USDC)</label>{I('monthlyBudget','number')}</div>
-          </div>
-          <div className="grid-2">
-            <div className="form-group"><label className="form-label">Per-Transaction Limit (USDC)</label>{I('perTxLimit','number')}</div>
-            <div className="form-group">
-              <label className="form-label">Auto-Approve Below (USDC)</label>
-              {I('autoApproveThreshold','number')}
-              <p className="form-hint">Saved for HITL flows; pending approvals still require a click today.</p>
-            </div>
-          </div>
+              <h3 className="policy-h3">URL firewall</h3>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Whitelisted URLs</label>
+                  {T('whitelistedURLs','localhost:9090\napi.trusted.com')}
+                  <p className="form-hint">One host per line. Loopback variants added when either <span className="mono">localhost</span> or <span className="mono">127.0.0.1</span> appears.</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Blacklisted URLs</label>
+                  {T('blacklistedURLs','casino.com\ndrain.io')}
+                  <p className="form-hint">Hostname match → HTTP 403 before forward.</p>
+                </div>
+              </div>
 
-          <p className="form-section">URL firewall (proxy)</p>
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Whitelisted URLs</label>
-              {T('whitelistedURLs','localhost:9090\napi.trusted.com')}
-              <p className="form-hint">One per line. Hostnames sync to the proxy; localhost and 127.0.0.1 are both added when either appears.</p>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Blacklisted URLs</label>
-              {T('blacklistedURLs','casino.com\ndrain.io')}
-              <p className="form-hint">Enforced by the Aegis proxy (403) when the local stack is running.</p>
-            </div>
-          </div>
+              <h3 className="policy-h3">Hostname keyword blocklist</h3>
+              <div className="form-group">
+                <label className="form-label">Keywords</label>
+                {T('keywordBlocklist','drain\ncasino\nmeme')}
+                <p className="form-hint">Substring match on <strong>hostname</strong> only (not paths — <span className="mono">/health</span> unaffected).</p>
+              </div>
 
-          <p className="form-section">Solana payTo allow / deny (proxy)</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>
-            Enforced on <strong>x402 payment recipients</strong> (<span className="mono">payTo</span> in the 402 challenge). <strong>Empty allowlist</strong> means any recipient is allowed except those on the denylist. Add your own wallet base58 here if you use a strict allowlist.
-          </p>
-          <div className="grid-2">
-            <div className="form-group"><label className="form-label">Allowlisted addresses</label>{T('whitelistedAddresses','Solana base58...')}</div>
-            <div className="form-group"><label className="form-label">Denylisted addresses</label>{T('blacklistedAddresses','Never pay this base58...')}</div>
-          </div>
+              <h3 className="policy-h3">Solana payTo allow / deny</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>
+                Evaluated on x402 <span className="mono">payTo</span> in the 402 body. Empty allowlist permits any recipient not on the denylist.
+              </p>
+              <div className="grid-2">
+                <div className="form-group"><label className="form-label">Allowlisted addresses</label>{T('whitelistedAddresses','Solana base58...')}</div>
+                <div className="form-group"><label className="form-label">Denylisted addresses</label>{T('blacklistedAddresses','Never pay this base58...')}</div>
+              </div>
+            </section>
 
-          <p className="form-section">On-chain program IDs (config only)</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>Persisted for agent tooling — not checked by the HTTP proxy.</p>
-          <div className="grid-2">
-            <div className="form-group"><label className="form-label">Whitelisted Program IDs</label>{T('whitelistedProgramIDs','ProgramID...')}</div>
-            <div className="form-group">
-              <label className="form-label">Blacklisted Program IDs</label>
-              {T('blacklistedProgramIDs','BadProgramID...')}
-              <p className="form-hint">Intended for agent tooling, not the x402 proxy.</p>
-            </div>
-          </div>
+            <section className="policy-section">
+              <h2 className="policy-h2">App &amp; dashboard</h2>
+              <p className="policy-note">
+                Stored in <span className="mono">~/.aegis/config.json</span> for this app, HITL queues, and agents. Weekly/monthly totals feed Overview; they are not enforced in the proxy binary.
+              </p>
 
-          <p className="form-section">Hostname keywords (proxy)</p>
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Keyword blocklist</label>
-              {T('keywordBlocklist','drain\ncasino\nmeme')}
-              <p className="form-hint">Substring on <strong>hostname</strong> only — not URL paths (so <span className="mono">/health</span> is safe).</p>
-            </div>
-            <div className="form-group"><label className="form-label">Forbidden actions (config)</label>{T('forbiddenActions','swap on unapproved DEX')}
-              <p className="form-hint">For agent prompts only — not parsed by the proxy.</p>
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Priority instructions (config)</label>
-            {T('priorityInstructions','Never interact with meme tokens. Only use approved DEXes.')}
-            <p className="form-hint">For agent prompts / exports — not enforced by the HTTP proxy.</p>
-          </div>
+              <h3 className="policy-h3">Dashboard budgets &amp; HITL</h3>
+              <div className="policy-budget-strip">
+                <div className="policy-budget-cell">
+                  <div className="form-group"><label className="form-label">Weekly budget (USDC)</label>{I('weeklyBudget','number')}</div>
+                </div>
+                <div className="policy-budget-cell">
+                  <div className="form-group"><label className="form-label">Monthly budget (USDC)</label>{I('monthlyBudget','number')}</div>
+                </div>
+                <div className="policy-budget-cell">
+                  <div className="form-group">
+                    <label className="form-label">Auto-approve below (USDC)</label>
+                    {I('autoApproveThreshold','number')}
+                    <p className="form-hint">Reserved for automation; approvals remain manual in this build.</p>
+                  </div>
+                </div>
+              </div>
 
-          <p className="form-section">Token mints (config)</p>
-          <p className="form-hint" style={{marginBottom:'12px'}}>Persisted for future hooks; x402 proxy does not inspect SPL mints yet.</p>
-          <div className="grid-2">
-            <div className="form-group"><label className="form-label">Allowed Token Mints</label>{T('allowedTokenMints','Leave empty to allow all')}</div>
-            <div className="form-group"><label className="form-label">Blocked Token Mints</label>{T('blockedTokenMints','MintAddress...')}</div>
+              <h3 className="policy-h3">On-chain program IDs</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>For downstream agent checks — not parsed by the HTTP proxy.</p>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Whitelisted program IDs</label>{T('whitelistedProgramIDs','ProgramID...')}</div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group">
+                    <label className="form-label">Blacklisted program IDs</label>
+                    {T('blacklistedProgramIDs','BadProgramID...')}
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">Token mints</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>Stored for future settlement hooks.</p>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Allowed token mints</label>{T('allowedTokenMints','Leave empty to allow all')}</div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Blocked token mints</label>{T('blockedTokenMints','MintAddress...')}</div>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">Agent prompts</h3>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Forbidden actions</label>{T('forbiddenActions','swap on unapproved DEX')}
+                    <p className="form-hint">Injected into agent policy packs.</p>
+                  </div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group">
+                    <label className="form-label">Priority instructions</label>
+                    {T('priorityInstructions','Only use approved DEXes.')}
+                    <p className="form-hint">High-level guardrails for tooling.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       );
@@ -1073,15 +1608,15 @@
               </div>
               <div className="ks-row">
                 <span className="ks-label">Share 1</span>
-                <span className="ks-val" style={{color:'var(--green)'}}>● OS Credential Manager (keytar)</span>
+                <span className="ks-val" style={{color:'var(--signal-ok)'}}>● OS Credential Manager (keytar)</span>
               </div>
               <div className="ks-row">
                 <span className="ks-label">Share 2</span>
-                <span className="ks-val" style={{color:'var(--green)'}}>● AES-256 Encrypted File (~/.aegis/share2.enc)</span>
+                <span className="ks-val" style={{color:'var(--signal-ok)'}}>● AES-256 Encrypted File (~/.aegis/share2.enc)</span>
               </div>
               <div className="ks-row">
                 <span className="ks-label">Share 3</span>
-                <span className="ks-val" style={{color: walletStatus.recoveryExists ? 'var(--amber)' : 'var(--dim)'}}>
+                <span className="ks-val" style={{color: walletStatus.recoveryExists ? '#a08262' : 'var(--dim)'}}>
                   {walletStatus.recoveryExists ? '● Offline Recovery Export' : '○ Not exported'}
                 </span>
               </div>
@@ -1352,13 +1887,13 @@
       ];
 
       return (
-        <div style={{display:'flex', height:'100vh', overflow:'hidden'}}>
+        <div style={{display:'flex', flex:1, width:'100%', minHeight:0, overflow:'hidden'}}>
 
           {/* SIDEBAR */}
           <div className="sidebar">
             <div className="sidebar-logo">
               <div className="sidebar-logo-text">AEGIS</div>
-              <div className="sidebar-logo-sub">Agent Gateway</div>
+              <div className="sidebar-logo-sub">Secure gateway</div>
             </div>
 
             {['Monitor','Configure'].map(group => (
@@ -1387,18 +1922,18 @@
           <div className="main">
             <div className="topbar">
               <span className="topbar-title">
-                {tab==='overview' ? 'Overview' : tab==='activity' ? 'Transaction Activity' : tab==='policy' ? 'Policy Rules' : 'Wallet & Key Management'}
+                {tab==='overview' ? 'Overview' : tab==='activity' ? 'Transaction activity' : tab==='policy' ? 'Policy & enforcement' : 'Wallet & keys'}
               </span>
-              <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+              <div className="topbar-actions">
                 <button type="button" className="btn btn-outline" style={{fontSize:'12px', padding:'6px 12px'}}
                   onClick={() => ipc.invoke('open-agent-demo-window')}>
                   Agent demo chat
                 </button>
-                {walletStatus && walletStatus.publicKey && (
-                  <span style={{fontSize:'11px', fontFamily:'monospace', color:'var(--dim)'}}>
-                    {walletStatus.publicKey.slice(0,6)}…{walletStatus.publicKey.slice(-4)}
-                  </span>
-                )}
+                <span className={'topbar-pubkey' + (walletStatus && walletStatus.publicKey ? '' : ' topbar-pubkey--empty')}>
+                  {walletStatus && walletStatus.publicKey
+                    ? `${walletStatus.publicKey.slice(0,6)}…${walletStatus.publicKey.slice(-4)}`
+                    : ''}
+                </span>
                 <span className={`topbar-status ${pending.length ? 'topbar-warn' : ''}`}>
                   {pending.length > 0
                     ? `⚠ ${pending.length} pending approval${pending.length>1?'s':''}`
@@ -1408,7 +1943,15 @@
             </div>
 
             <div className="content">
-              {tab==='overview' && <OverviewTab stats={stats} walletStatus={walletStatus} pendingCount={pending.length} localStack={localStackEl} proxyOverview={proxyOverview}/>}
+              {tab==='overview' && (
+                <OverviewTab
+                  stats={stats}
+                  walletStatus={walletStatus}
+                  pendingCount={pending.length}
+                  localStack={localStackEl}
+                  proxyOverview={proxyOverview}
+                />
+              )}
               {tab==='activity' && <ActivityTab activity={activity} pending={pending} proxyActivity={proxyActivity} onApprove={handleApprove} onDeny={handleDeny}/>}
               {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy} proxyPolicy={proxyPolicy} stackStatus={stackStatus}/>}
               {tab==='wallet'   && <WalletTab   walletStatus={walletStatus} onProvision={handleProvision}/>}

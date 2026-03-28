@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Aegis — Agent demo</title>
+  <title>Aegis — Agent Demo</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -32,7 +32,7 @@
       font-size: 12px;
       color: var(--muted);
     }
-    header strong { color: var(--text); font-size: 14px; display: block; margin-bottom: 4px; }
+    header strong { color: var(--text); font-size: 15px; font-weight: 600; display: block; }
     #log {
       flex: 1;
       overflow-y: auto;
@@ -92,12 +92,6 @@
       color: #fff;
     }
     button.primary:hover { filter: brightness(1.08); }
-    .hint {
-      padding: 0 16px 12px;
-      font-size: 11px;
-      color: var(--dim);
-      line-height: 1.4;
-    }
     code { font-family: var(--mono); font-size: 11px; color: #94a3b8; }
     .probe-panel {
       padding: 12px 16px;
@@ -143,14 +137,9 @@
 </head>
 <body>
   <header>
-    <strong>Agent demo (simulated)</strong>
-    Framed for the <strong>agentic economy</strong> (policy + machine payments); hackathon build focuses on <strong>x402</strong> through the proxy — no live OpenClaw agent in this window. Scripted steps + real <strong>curl</strong> against the local stack (Start in main app).
+    <strong>Agent Demo</strong>
   </header>
   <div id="log"></div>
-  <p class="hint">
-    On HTTP 402 the Aegis proxy adds x402 <code>PAYMENT-SIGNATURE</code> (payment auth), not arbitrary site API keys.
-    Spend caps: lower daily/per-tx on Policy, save, repeat requests — watch Activity.
-  </p>
   <div class="probe-panel">
     <h3>Probe a URL (stack running)</h3>
     <div class="probe-row">
@@ -392,8 +381,6 @@
     }
 
     document.getElementById('btnProbe').addEventListener('click', runProbe);
-
-    addMsg('agent', 'Use <strong>Probe a URL</strong> / <strong>Run live checks</strong> to validate the proxy + premium API (x402 path). Main story is <strong>not</strong> an LLM gateway — it is HTTP 402 → PAYMENT-SIGNATURE → policy/caps.');
   </script>
 </body>
 </html>

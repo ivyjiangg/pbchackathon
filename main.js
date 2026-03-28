@@ -68,7 +68,7 @@ function registerIpcHandlers() {
     agentDemoWindow = new BrowserWindow({
       width: 440,
       height: 760,
-      title: 'Aegis — Agent demo',
+      title: 'Aegis — Agent Demo',
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -213,8 +213,8 @@ function registerIpcHandlers() {
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1100,
-    height: 750,
+    width: 1400,
+    height: 800,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
