@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Aegis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+    }
+    #root {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    :root {
+      --bg:      #060608;
+      --card:    #0c0c10;
+      --sidebar: #08080c;
+      --border:  rgba(255,255,255,0.065);
+      --blue:    #5b9dc9;
+      --accent:  #5b9dc9;
+      --accent-soft: rgba(91, 157, 201, 0.09);
+      /* Default semantic (sidebar dots, etc.) */
+      --green:   #4f7d72;
+      --red:     #a65d5d;
+      --amber:   #9a7349;
+      /* Muted UI accents — traffic tiles, pills, stack status (institutional, low-chroma) */
+      --signal-danger:     #a88484;
+      --signal-danger-edge: rgba(152, 118, 118, 0.55);
+      --signal-danger-fill: rgba(152, 118, 118, 0.08);
+      --signal-ok:         #8a9e94;
+      --signal-ok-edge:    rgba(120, 145, 135, 0.5);
+      --signal-ok-fill:    rgba(120, 145, 135, 0.1);
+      --signal-forward:    #7c8794;
+      --signal-forward-edge: rgba(110, 122, 136, 0.45);
+      --signal-forward-fill: rgba(110, 122, 136, 0.07);
+      --text:    #e8eaed;
+      --muted:   #64748b;
+      --dim:     #525a66;
+      --sub:     #8b95a3;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:    'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 204px;
+      min-width: 204px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+    .sidebar-logo {
+      padding: 22px 20px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #fff;
+    }
+    .sidebar-logo-sub {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .nav-section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+      padding: 18px 20px 6px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 13px;
+      border-left: 2px solid transparent;
+      transition: all 0.12s;
+      position: relative;
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.025); }
+    .nav-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .nav-badge {
+      margin-left: auto;
+      background: rgba(154, 123, 85, 0.14);
+      color: #a08262;
+      border-radius: 999px;
+      font-size: 10px;
+      padding: 1px 7px;
+    }
+    .agent-status-block {
+      margin-top: auto;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(79, 125, 114, 0.4);
+    }
+    .status-dot.offline { background: var(--dim); box-shadow: none; }
+    .status-key {
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--dim);
+      font-family: var(--mono);
+      word-break: break-all;
+    }
+
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .topbar {
+      padding: 14px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      background: var(--sidebar);
+      flex-shrink: 0;
+      width: 100%;
+    }
+    .topbar-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .topbar-actions .btn { flex-shrink: 0; }
+    .topbar-pubkey {
+      font-size: 12px;
+      font-family: var(--font-sans);
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      min-width: 7.25rem;
+      text-align: right;
+    }
+    .topbar-pubkey--empty {
+      min-width: 0;
+      width: 0;
+      overflow: hidden;
+      padding: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .topbar-status {
+      font-size: 12px;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      min-width: 12.5rem;
+      text-align: right;
+    }
+    .topbar-warn { color: var(--amber); }
+    .content {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px 28px;
+    }
+    .content > * {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .card:hover { border-color: rgba(255,255,255,0.1); }
+    .card + .card { margin-top: 14px; }
+    .overview-kpi-grid > .card { min-width: 0; }
+
+    /* Policy tab — single surface, flat sections (no nested cards) */
+    .policy-page {
+      width: 100%;
+      max-width: 100%;
+    }
+    .policy-page__surface {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 28px 28px;
+    }
+    .policy-page__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .policy-page__lead {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0 0 22px 0;
+      max-width: 56rem;
+    }
+    .policy-section {
+      margin: 0;
+      padding: 0;
+    }
+    .policy-section + .policy-section {
+      margin-top: 32px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    .policy-h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #f1f5f9;
+      margin: 0 0 10px 0;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      font-family: var(--font-sans);
+    }
+    .policy-h3 {
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      text-transform: none;
+      color: #cbd5e1;
+      margin: 24px 0 8px 0;
+      font-family: var(--font-sans);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .policy-h3::before {
+      content: '';
+      width: 2px;
+      height: 0.85em;
+      border-radius: 1px;
+      background: rgba(71, 85, 105, 0.75);
+      flex-shrink: 0;
+    }
+    .policy-h3:first-child { margin-top: 0; }
+    .policy-note {
+      font-size: 12px;
+      color: var(--dim);
+      line-height: 1.5;
+      margin: 0 0 16px 0;
+      max-width: 56rem;
+    }
+    .policy-readout {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+    .policy-readout__caption {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 10px 0;
+    }
+    .policy-readout__path {
+      font-size: 11px;
+      color: var(--dim);
+      font-family: var(--mono);
+      word-break: break-all;
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+    .policy-kv-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: var(--font-sans);
+    }
+    .policy-kv-table th {
+      text-align: left;
+      color: var(--dim);
+      font-weight: 500;
+      padding: 5px 14px 5px 0;
+      vertical-align: top;
+      width: 10.5rem;
+    }
+    .policy-kv-table td {
+      color: var(--muted);
+      padding: 5px 0;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .policy-readout__actions {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .policy-missing {
+      border: 1px dashed rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* App & dashboard — neutral grouping (no semantic color coding on Policy) */
+    .policy-budget-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .policy-budget-cell {
+      padding: 12px 14px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .policy-budget-cell:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .policy-pair-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+    .policy-field-slab {
+      border-radius: 10px;
+      padding: 14px 16px 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      border-left: 2px solid rgba(71, 85, 105, 0.5);
+      transition: border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .policy-field-slab:hover {
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+    }
+    .policy-field-slab .form-group { margin-bottom: 0; }
+    .policy-field-slab .form-textarea { min-height: 88px; }
+
+    /* ── GRIDS ── */
+    /* Overview KPI row: always four equal columns (Activity tab uses the same type scale). */
+    .overview-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+      width: 100%;
+    }
+    @media (max-width: 640px) {
+      .overview-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+
+    /* ── STAT CARDS ── */
+    /* Match Activity tab: Inter + tabular nums for figures (see .a-amt / .a-url). */
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .stat-value {
+      font-family: var(--font-sans);
+      font-size: 28px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: #f8fafc;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+    }
+    .stat-sub {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--font-sans);
+      line-height: 1.4;
+      font-weight: 400;
+    }
+    .stat-value--text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    /* ── PROXY ACTIVITY STRIP (Overview) ── */
+    .proxy-metric-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+      width: 100%;
+    }
+    @media (max-width: 720px) {
+      .proxy-metric-strip { grid-template-columns: 1fr; }
+    }
+    .proxy-metric {
+      border-radius: 10px;
+      padding: 14px 14px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-left-width: 2px;
+    }
+    .proxy-metric--blocked { border-left-color: var(--signal-danger-edge); background: var(--signal-danger-fill); }
+    .proxy-metric--forward { border-left-color: var(--signal-forward-edge); background: var(--signal-forward-fill); }
+    .proxy-metric--paid   { border-left-color: var(--signal-ok-edge); background: var(--signal-ok-fill); }
+    .proxy-metric-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-family: var(--font-sans);
+    }
+    .proxy-metric-num {
+      font-family: var(--font-sans);
+      font-size: 28px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      color: #f8fafc;
+      letter-spacing: -0.01em;
+    }
+    .proxy-metric-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      font-weight: 400;
+      font-family: var(--font-sans);
+    }
+
+    /* ── LOCAL STACK STATUS ── */
+    .stack-run-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .stack-run-tile {
+      border-radius: 10px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .stack-run-tile.is-live {
+      border-color: rgba(120, 145, 135, 0.28);
+      background: var(--signal-ok-fill);
+    }
+    .stack-run-kicker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--sub);
+      margin-bottom: 6px;
+    }
+    .stack-run-state {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      font-family: var(--font-sans);
+      line-height: 1.4;
+    }
+    .stack-run-state.on { color: var(--signal-ok); }
+    .stack-run-state.off { color: var(--muted); }
+    .stack-health-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 20px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .stack-health-kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--sub);
+      margin-right: 4px;
+    }
+    .stack-health-item {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stack-health-item .hl-name { color: var(--muted); font-weight: 500; margin-right: 6px; }
+    .stack-health-item .hl-ok { color: var(--signal-ok); }
+    .stack-health-item .hl-wait { color: var(--dim); font-weight: 500; }
+
+    /* ── BUDGET BARS ── */
+    .budget-row { margin-bottom: 14px; }
+    .budget-row:last-child { margin-bottom: 0; }
+    .budget-hdr { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+    .budget-name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
+    .budget-nums { font-size: 12px; font-family: inherit; font-variant-numeric: tabular-nums; color: var(--text); }
+    .budget-track { height: 3px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; }
+    .budget-fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.5s ease; }
+    .budget-fill.warn   { background: rgba(154, 123, 85, 0.85); }
+    .budget-fill.danger { background: rgba(152, 118, 118, 0.9); }
+
+    /* ── PILLS ── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .pill-approved { background: var(--signal-ok-fill); border: 1px solid rgba(120, 145, 135, 0.28); color: var(--signal-ok); }
+    .pill-blocked  { background: var(--signal-danger-fill); border: 1px solid rgba(152, 118, 118, 0.28); color: var(--signal-danger); }
+    .pill-pending  { background: rgba(154, 123, 85, 0.09); border: 1px solid rgba(154, 123, 85, 0.22); color: #a08262; }
+    .pill-active   { background: var(--signal-forward-fill); border: 1px solid rgba(110, 122, 136, 0.28); color: var(--signal-forward); }
+
+    /* ── ACTIVITY TABLE ── */
+    .activity-table { width: 100%; border-collapse: collapse; }
+    .activity-th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      padding-bottom: 10px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    .activity-th.right { text-align: right; }
+    .activity-row {
+      border-bottom: 1px solid var(--border);
+      animation: slide-in 0.2s ease;
+    }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(-3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .activity-row.pending-row {
+      border-left: 2px solid rgba(154, 123, 85, 0.45);
+      background: rgba(154, 123, 85, 0.04);
+      animation: slide-in 0.2s ease, pulse-border 2s ease-in-out infinite;
+    }
+    @keyframes pulse-border {
+      0%,100% { border-left-color: rgba(154, 123, 85, 0.35); }
+      50%      { border-left-color: rgba(154, 123, 85, 0.55); }
+    }
+    .activity-row td { padding: 13px 10px; vertical-align: top; }
+    .activity-row td:first-child { padding-left: 2px; }
+    .a-url   {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 400;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .a-amt   {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+      color: var(--sub);
+    }
+    .a-time  {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .a-sig   {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--dim);
+      margin-top: 4px;
+      letter-spacing: -0.01em;
+    }
+    .a-source {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+    .pending-expand {
+      padding-top: 12px;
+      border-top: 1px solid rgba(154, 123, 85, 0.15);
+      margin-top: 10px;
+    }
+    .pending-detail { font-size: 12px; font-family: inherit; color: var(--muted); margin-bottom: 10px; line-height: 1.6; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.18s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.18s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.18s ease, transform 0.12s cubic-bezier(0.25, 1, 0.5, 1);
+      border: none;
+      padding: 8px 20px;
+      font-family: inherit;
+    }
+    .btn-primary  { background: var(--accent);  color: #0a0a0c; font-weight: 600; }
+    .btn-primary:hover  { background: #7eb8e0; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-outline  { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover  { border-color: rgba(255,255,255,0.18); }
+    .btn-approve  { background: var(--signal-ok-fill); border: 1px solid rgba(120, 145, 135, 0.35); color: var(--signal-ok); padding: 5px 14px; font-size: 12px; font-weight: 500; }
+    .btn-approve:hover  { background: rgba(120, 145, 135, 0.16); }
+    .btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-deny     { background: transparent; border: 1px solid rgba(152, 118, 118, 0.35); color: var(--signal-danger); padding: 5px 14px; font-size: 12px; font-weight: 500; }
+    .btn-deny:hover     { background: var(--signal-danger-fill); }
+
+    /* ── INPUTS ── */
+    .form-group { margin-bottom: 18px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .form-input, .form-textarea {
+      width: 100%;
+      background: #161626;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      font-family: var(--font-sans);
+      font-variant-numeric: tabular-nums;
+    }
+    .form-input::placeholder, .form-textarea::placeholder { color: var(--dim); }
+    .form-input:hover, .form-textarea:hover {
+      border-color: rgba(255,255,255,0.14);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
+      background: #18182a;
+    }
+    .form-input:focus, .form-textarea:focus {
+      border-color: rgba(100, 130, 165, 0.65);
+      box-shadow: 0 0 0 2px rgba(80, 110, 145, 0.28);
+      background: #18182a;
+    }
+    /* Policy page: inputs stay fully neutral (no cool tint on focus) */
+    .policy-page .form-input:focus,
+    .policy-page .form-textarea:focus {
+      border-color: rgba(255,255,255,0.22);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.06);
+    }
+    .form-textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
+    .form-hint { font-size: 11px; color: var(--dim); margin-top: 4px; }
+    .form-section {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--dim);
+      margin: 24px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .form-section:first-of-type { margin-top: 8px; }
+
+    /* ── SECTION HEADER ── */
+    .sec-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .sec-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+      font-family: var(--font-sans);
+    }
+
+    /* ── KEY STATUS ROWS ── */
+    .ks-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .ks-row:last-child { border-bottom: none; }
+    .ks-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); }
+    .ks-val   { font-size: 12px; font-family: inherit; color: var(--text); display: flex; align-items: center; gap: 8px; }
+
+    /* ── COPY BTN ── */
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.13s;
+    }
+    .copy-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .copy-btn.copied { border-color: rgba(120, 145, 135, 0.35); color: var(--signal-ok); }
+
+    /* ── EMPTY STATE ── */
+    .empty { text-align: center; padding: 52px 24px; color: var(--muted); }
+    .empty svg { margin: 0 auto 18px; display: block; opacity: 0.25; }
+    .empty p { font-size: 13px; }
+
+    /* ── ALERT BANNER ── */
+    .alert-banner {
+      background: rgba(154, 123, 85, 0.07);
+      border: 1px solid rgba(154, 123, 85, 0.22);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #a08262;
+    }
+
+    /* ── MISC ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+    .mono { font-family: var(--mono); }
+    pre { font-family: var(--mono); }
+    hr.div { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+    /* ── SPINNER ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    .btn-primary .spinner {
+      border: 2px solid rgba(10,10,12,0.2);
+      border-top-color: #0a0a0c;
+    }
+
+    /* ── SUCCESS/ERROR TOASTS ── */
+    .toast-ok  { padding: 10px 14px; background: var(--signal-ok-fill);  border: 1px solid rgba(120, 145, 135, 0.22);  border-radius: 8px; font-size: 12px; color: var(--signal-ok); font-family: inherit; margin-bottom: 14px; }
+    .toast-err { padding: 10px 14px; background: var(--signal-danger-fill);   border: 1px solid rgba(152, 118, 118, 0.22);   border-radius: 8px; font-size: 12px; color: var(--signal-danger);   font-family: inherit; margin-bottom: 14px; }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.985);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn,
+      .card,
+      .policy-field-slab,
+      .policy-budget-cell,
+      .form-input,
+      .form-textarea,
+      .nav-item,
+      .stack-run-tile,
+      .copy-btn {
+        transition-duration: 0.01ms !important;
+      }
+      .btn:active:not(:disabled) { transform: none; }
+      .activity-row { animation: none !important; }
+      .spinner { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"><p style="color:#666;padding:20px;font-family:monospace;">Initializing...</p></div>
+
+  <script>
+    window.onerror = function(msg, src, line, col, err) {
+      document.getElementById('root').innerHTML =
+        '<pre style="color:#ef4444;padding:20px;font-size:12px;white-space:pre-wrap;">' +
+        'ERROR: ' + msg + '\nAt: ' + src + ':' + line + '\n' + (err ? err.stack : '') +
+        '</pre>';
+    };
+    try {
+      window._ipc = require('electron').ipcRenderer;
+    } catch(e) {
+      window._ipc = { invoke: async (ch, ...a) => { console.warn('IPC mock:', ch, a); return null; } };
+    }
+    window.React    = require('react');
+    window.ReactDOM = require('react-dom/client');
+  </script>
+  <script src="node_modules/babel-standalone/babel.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+    const ipc = window._ipc;
+
+    // ── ICONS (dot-and-line SVG) ───────────────────────────────────────────────
+    const IconOverview = () => (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        {[2,7,12].flatMap(x => [2,7,12].map(y =>
+          <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" fill="currentColor"/>
+        ))}
+      </svg>
+    );
+    const IconActivity = () => (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1">
+        <circle cx="2" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="7"  cy="5"  r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="13" cy="10" r="1.5" fill="currentColor" stroke="none"/>
+        <line x1="3.5" y1="10" x2="5.5" y2="5"/>
+        <line x1="8.5" y1="5"  x2="11.5" y2="10"/>
+      </svg>
+    );
+    const IconPolicy = () => (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1">
+        <circle cx="7.5" cy="2"  r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="2"   cy="13" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="13"  cy="13" r="1.5" fill="currentColor" stroke="none"/>
+        <line x1="7.5" y1="3.5" x2="2"   y2="11.5"/>
+        <line x1="7.5" y1="3.5" x2="13"  y2="11.5"/>
+        <line x1="2"   y1="13"  x2="13"  y2="13"/>
+      </svg>
+    );
+    const IconWallet = () => (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1">
+        <circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="7.5" cy="1.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="7.5" cy="13.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="1.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="13.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/>
+        <line x1="7.5" y1="3" x2="7.5" y2="6"/>
+        <line x1="7.5" y1="9" x2="7.5" y2="12"/>
+        <line x1="3"   y1="7.5" x2="6" y2="7.5"/>
+        <line x1="9"   y1="7.5" x2="12" y2="7.5"/>
+      </svg>
+    );
+
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+    const StatusPill = ({ status }) => {
+      const cls = status === 'APPROVED' ? 'pill-approved'
+                : status === 'BLOCKED'  ? 'pill-blocked'
+                : status === 'FORWARD'  ? 'pill-active'
+                :                         'pill-pending';
+      return <span className={`pill ${cls}`}>{status}</span>;
+    };
+
+    const CopyButton = ({ value }) => {
+      const [copied, setCopied] = useState(false);
+      return (
+        <button className={`copy-btn ${copied ? 'copied' : ''}`}
+          onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+          {copied ? '✓ copied' : 'copy'}
+        </button>
+      );
+    };
+
+    const BudgetBar = ({ label, spent, total }) => {
+      const pct = total > 0 ? Math.min(100, (spent / total) * 100) : 0;
+      const cls = pct > 90 ? 'danger' : pct > 70 ? 'warn' : '';
+      return (
+        <div className="budget-row">
+          <div className="budget-hdr">
+            <span className="budget-name">{label}</span>
+            <span className="budget-nums">
+              <span>${spent.toFixed(2)}</span>
+              <span style={{color:'var(--dim)'}}> / </span>
+              <span>${total.toFixed(2)}</span>
+            </span>
+          </div>
+          <div className="budget-track">
+            <div className={`budget-fill ${cls}`} style={{width:`${pct}%`}}/>
+          </div>
+        </div>
+      );
+    };
+
+    const EmptyState = ({ message }) => (
+      <div className="empty">
+        <svg width="44" height="44" viewBox="0 0 44 44" fill="none" stroke="#44445a" strokeWidth="1">
+          <circle cx="22" cy="22" r="1.5" fill="#44445a" stroke="none"/>
+          <circle cx="8"  cy="22" r="1.5" fill="#44445a" stroke="none"/>
+          <circle cx="36" cy="22" r="1.5" fill="#44445a" stroke="none"/>
+          <circle cx="22" cy="8"  r="1.5" fill="#44445a" stroke="none"/>
+          <circle cx="22" cy="36" r="1.5" fill="#44445a" stroke="none"/>
+          <line x1="9.5"  y1="22" x2="20.5" y2="22"/>
+          <line x1="23.5" y1="22" x2="34.5" y2="22"/>
+          <line x1="22" y1="9.5"  x2="22" y2="20.5"/>
+          <line x1="22" y1="23.5" x2="22" y2="34.5"/>
+        </svg>
+        <p>{message}</p>
+      </div>
+    );
+
+    // ── LOCAL STACK ───────────────────────────────────────────────────────────
+    const defaultStackPorts = { proxy: 8080, premium: 9090 };
+    const LocalStackCard = ({
+      stackPorts,
+      setStackPorts,
+      stackStatus,
+      stackLogs,
+      healthPremium,
+      healthProxy,
+      scriptOut,
+      scriptBusy,
+      proofJson,
+      onStart,
+      onStop,
+      onClearLogs,
+      onRunSmoke,
+      onRunProof,
+    }) => {
+      const proxyOn = !!(stackStatus && stackStatus.proxyRunning);
+      const premOn = !!(stackStatus && stackStatus.premiumRunning);
+      const premHl = !!(healthPremium && healthPremium.ok);
+      const proxyHl = !!(healthProxy && healthProxy.ok);
+      return (
+      <div className="card" style={{marginBottom:'16px'}}>
+        <div className="sec-hdr">
+          <span className="sec-title">Local stack</span>
+          <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+            <button className="btn btn-outline" onClick={onClearLogs} type="button">Clear logs</button>
+            <button className="btn btn-outline" onClick={onStop} disabled={!stackStatus || (!stackStatus.proxyRunning && !stackStatus.premiumRunning)} type="button">Stop</button>
+            <button className="btn btn-primary" onClick={onStart} disabled={!!(stackStatus && stackStatus.proxyRunning)} type="button">Start</button>
+          </div>
+        </div>
+        <div className="grid-2" style={{marginBottom:'12px'}}>
+          <div className="form-group">
+            <label className="form-label">Proxy port</label>
+            <input className="form-input" type="number" min="1" max="65535"
+              value={stackPorts.proxy}
+              onChange={e => setStackPorts(p => ({ ...p, proxy: Number(e.target.value) || 8080 }))}
+              disabled={!!(stackStatus && stackStatus.proxyRunning)}/>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Premium API port</label>
+            <input className="form-input" type="number" min="1" max="65535"
+              value={stackPorts.premium}
+              onChange={e => setStackPorts(p => ({ ...p, premium: Number(e.target.value) || 9090 }))}
+              disabled={!!(stackStatus && stackStatus.proxyRunning)}/>
+          </div>
+        </div>
+        <div>
+          <div className="stack-run-grid">
+            <div className={'stack-run-tile' + (proxyOn ? ' is-live' : '')}>
+              <div className="stack-run-kicker">Proxy</div>
+              <div className={'stack-run-state ' + (proxyOn ? 'on' : 'off')}>{proxyOn ? 'Running' : 'Stopped'}</div>
+            </div>
+            <div className={'stack-run-tile' + (premOn ? ' is-live' : '')}>
+              <div className="stack-run-kicker">Premium API</div>
+              <div className={'stack-run-state ' + (premOn ? 'on' : 'off')}>{premOn ? 'Running' : 'Stopped'}</div>
+            </div>
+          </div>
+          <div className="stack-health-bar">
+            <span className="stack-health-kicker">Health</span>
+            <span className="stack-health-item">
+              <span className="hl-name">Premium</span>
+              {premHl ? <span className="hl-ok">OK</span> : <span className="hl-wait">Not checked</span>}
+            </span>
+            <span className="stack-health-item">
+              <span className="hl-name">Proxy</span>
+              {proxyHl ? <span className="hl-ok">OK</span> : <span className="hl-wait">Not checked</span>}
+            </span>
+          </div>
+        </div>
+        <div className="sec-hdr" style={{marginBottom:'8px'}}><span className="sec-title">Process logs</span></div>
+        <pre style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px', fontSize:'11px', maxHeight:'160px', overflow:'auto', whiteSpace:'pre-wrap', wordBreak:'break-all', color:'var(--muted)'}}>
+          {(stackLogs && stackLogs.length) ? stackLogs.map(l => `[${l.source}] ${l.line}`).join('\n') : 'No logs yet.'}
+        </pre>
+        <div className="sec-hdr" style={{marginTop:'16px', marginBottom:'8px'}}><span className="sec-title">Checks</span></div>
+        <div style={{display:'flex', gap:'10px', flexWrap:'wrap', marginBottom:'10px'}}>
+          <button className="btn btn-outline" onClick={onRunSmoke} disabled={scriptBusy} type="button">{scriptBusy ? 'Running…' : 'Run smoke test'}</button>
+          <button className="btn btn-outline" onClick={onRunProof} disabled={scriptBusy} type="button">Run strict devnet proof</button>
+        </div>
+        {scriptOut ? (
+          <pre style={{background:'#161626', border:'1px solid var(--border)', borderRadius:'8px', padding:'10px', fontSize:'11px', maxHeight:'160px', overflow:'auto', whiteSpace:'pre-wrap', color:'var(--muted)'}}>
+            {scriptOut}
+          </pre>
+        ) : null}
+        {proofJson ? (
+          <div className="toast-ok" style={{marginTop:'10px', fontSize:'11px', fontFamily:'var(--mono)'}}>
+            Proof file updated — HTTP {String(proofJson.status || '')} · {proofJson.notes || ''}
+          </div>
+        ) : null}
+      </div>
+      );
+    };
+
+    // ── OVERVIEW TAB ──────────────────────────────────────────────────────────
+    const OverviewTab = ({ stats, walletStatus, pendingCount, localStack, proxyOverview }) => (
+      <div style={{width:'100%', maxWidth:'100%'}}>
+        {localStack}
+        {proxyOverview && (
+          <div className="card" style={{marginBottom:'16px'}}>
+            <div className="sec-hdr"><span className="sec-title">Today’s traffic</span></div>
+            <div className="proxy-metric-strip">
+              <div className="proxy-metric proxy-metric--blocked">
+                <div className="proxy-metric-kicker">Blocked</div>
+                <div className="proxy-metric-num">{proxyOverview.blockedCount}</div>
+                <div className="proxy-metric-hint">Stopped by your rules</div>
+              </div>
+              <div className="proxy-metric proxy-metric--forward">
+                <div className="proxy-metric-kicker">Forwarded</div>
+                <div className="proxy-metric-num">{proxyOverview.forwardedCount}</div>
+                <div className="proxy-metric-hint">Allowed without a payment</div>
+              </div>
+              <div className="proxy-metric proxy-metric--paid">
+                <div className="proxy-metric-kicker">Paid</div>
+                <div className="proxy-metric-num">{proxyOverview.paidCount}</div>
+                <div className="proxy-metric-hint">Completed paid requests</div>
+              </div>
+            </div>
+          </div>
+        )}
+        {pendingCount > 0 && (
+          <div className="alert-banner">
+            <span>⚠</span>
+            <span>{pendingCount} transaction{pendingCount > 1 ? 's' : ''} awaiting your approval — go to Activity</span>
+          </div>
+        )}
+        <div className="overview-kpi-grid">
+          <div className="card">
+            <div className="stat-label">Spent Today</div>
+            <div className="stat-value">${stats ? stats.spentTodayUSDC.toFixed(2) : '0.00'}</div>
+            <div className="stat-sub">of ${stats ? stats.dailyBudgetUSDC.toFixed(2) : '—'} limit (HITL + x402)</div>
+          </div>
+          <div className="card">
+            <div className="stat-label">Transactions</div>
+            <div className="stat-value">{stats ? stats.transactionCount : 0}</div>
+            <div className="stat-sub">HITL approved + x402 paid (lifetime)</div>
+          </div>
+          <div className="card">
+            <div className="stat-label">Daily Remaining</div>
+            <div className="stat-value">${stats ? stats.dailyRemaining.toFixed(2) : '—'}</div>
+            <div className="stat-sub">USDC available</div>
+          </div>
+          <div className="card">
+            <div className="stat-label">Agent Status</div>
+            <div className="stat-value stat-value--text">
+              {walletStatus && walletStatus.provisioned
+                ? <span style={{color:'var(--signal-ok)'}}>Active</span>
+                : <span style={{color:'var(--dim)', fontWeight:600}}>Not set up</span>}
+            </div>
+            <div className="stat-sub" style={{wordBreak:'break-all'}}>
+              {walletStatus && walletStatus.publicKey
+                ? walletStatus.publicKey.slice(0,8) + '…' + walletStatus.publicKey.slice(-4)
+                : 'go to Wallet tab'}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="sec-hdr"><span className="sec-title">Budget utilization</span></div>
+          {stats
+            ? <div>
+                <BudgetBar label="Daily"   spent={stats.spentTodayUSDC} total={stats.dailyBudgetUSDC}/>
+                <BudgetBar label="Weekly"  spent={stats.spentWeekUSDC}  total={stats.weeklyBudgetUSDC}/>
+                <BudgetBar label="Monthly" spent={stats.spentMonthUSDC} total={stats.monthlyBudgetUSDC}/>
+              </div>
+            : <EmptyState message="Provision a wallet and the budget tracker will appear here."/>}
+        </div>
+      </div>
+    );
+
+    // ── ACTIVITY TAB ──────────────────────────────────────────────────────────
+    const ActivityTab = ({ activity, pending, proxyActivity, onApprove, onDeny }) => {
+      const [processing, setProcessing] = useState({});
+
+      const approve = async (id) => {
+        setProcessing(p => ({...p, [id]: 'approving'}));
+        await onApprove(id);
+        setProcessing(p => ({...p, [id]: null}));
+      };
+      const deny = async (id) => {
+        setProcessing(p => ({...p, [id]: 'denying'}));
+        await onDeny(id);
+        setProcessing(p => ({...p, [id]: null}));
+      };
+
+      const fmt = ts => {
+        try { return new Date(ts).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
+        catch (_) { return '—'; }
+      };
+
+      /** proxy-activity.jsonl: amount_micro is USDC × 1e6 for paid_success (same units as on-chain x402 amount). */
+      const proxyPaidAmountUsdc = (ev) => {
+        const o = ev.outcome || '';
+        if (o !== 'paid_success') return 0;
+        const raw = ev.amount_micro;
+        if (raw != null && String(raw).length > 0) {
+          try {
+            return Number(BigInt(String(raw))) / 1e6;
+          } catch (_) {
+            return 0;
+          }
+        }
+        return 0.5;
+      };
+
+      const proxyRows = (proxyActivity || []).map((ev, i) => {
+        const o = ev.outcome || '';
+        let st = 'BLOCKED';
+        if (o === 'paid_success') st = 'APPROVED';
+        else if (o === 'forwarded') st = 'FORWARD';
+        return {
+          id: 'proxy-' + i + '-' + (ev.ts || ''),
+          _proxy: true,
+          status: st,
+          url: ev.url || ev.hostname || '—',
+          amount: proxyPaidAmountUsdc(ev),
+          timestamp: ev.ts,
+          _detail: o
+        };
+      });
+
+      const pendingRows = (pending || []).map(p => ({...p, _pending: true}));
+      const resolvedRows = (activity || []).filter(a => a.status !== 'PENDING')
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const allRows = [...proxyRows, ...pendingRows, ...resolvedRows]
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 80);
+
+      if (allRows.length === 0) {
+        return (
+          <div className="card">
+            <EmptyState message="No activity yet. Start the local stack and use the proxy — events appear here. HITL approvals also show under Source: Wallet."/>
+          </div>
+        );
+      }
+
+      return (
+        <div className="card">
+          <div className="sec-hdr">
+            <span className="sec-title">Transaction Log</span>
+            <span style={{fontSize:'12px', color:'var(--muted)', fontFamily:'inherit', fontWeight:500}}>{allRows.length} entries</span>
+          </div>
+          <table className="activity-table">
+            <thead>
+              <tr>
+                <th className="activity-th">Source</th>
+                <th className="activity-th">Status</th>
+                <th className="activity-th">Endpoint</th>
+                <th className="activity-th right">Amount</th>
+                <th className="activity-th right">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allRows.map((row, i) => (
+                <tr key={row.id || i} className={`activity-row ${row._pending ? 'pending-row' : ''}`}>
+                  <td className="a-source">{row._proxy ? 'Proxy' : 'Wallet'}</td>
+                  <td style={{paddingTop: row._pending ? '14px' : undefined}}>
+                    <StatusPill status={row._pending ? 'PENDING' : row.status}/>
+                  </td>
+                  <td>
+                    <div className="a-url">{row.url || '—'}</div>
+                    {row._proxy && row._detail ? <div className="a-sig">{row._detail}</div> : null}
+                    {row._pending && (
+                      <div className="pending-expand">
+                        <div className="pending-detail">
+                          Amount: <span style={{color:'#9a7b55'}}>${parseFloat(row.amount||0).toFixed(2)} USDC</span><br/>
+                          To: {row.recipient || '—'}
+                        </div>
+                        <div style={{display:'flex', gap:'8px'}}>
+                          <button className="btn btn-approve" disabled={!!processing[row.id]}
+                            onClick={() => approve(row.id)}>
+                            {processing[row.id] === 'approving' ? <span className="spinner"/> : 'Approve'}
+                          </button>
+                          <button className="btn btn-deny" disabled={!!processing[row.id]}
+                            onClick={() => deny(row.id)}>
+                            Deny
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {row.signature && (
+                      <div className="a-sig">tx: {row.signature.slice(0,14)}…</div>
+                    )}
+                  </td>
+                  <td className="a-amt" style={{color: row._pending ? '#9a7b55' : undefined}}>
+                    ${parseFloat(row.amount||0).toFixed(2)}
+                  </td>
+                  <td className="a-time">{fmt(row.timestamp)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    };
+
+    // ── POLICY TAB ────────────────────────────────────────────────────────────
+    const PolicyTab = ({ config, onSave, proxyPolicy, stackStatus }) => {
+      const arrStr = a => (a || []).join('\n');
+      const toArr  = s => s.split('\n').map(x => x.trim()).filter(Boolean);
+
+      const [probeMsg, setProbeMsg] = useState(null);
+      const [formDirty, setFormDirty] = useState(false);
+      const [f, setF] = useState({
+        dailyBudget:'2.00', weeklyBudget:'10.00', monthlyBudget:'50.00',
+        perTxLimit:'0.50', autoApproveThreshold:'1.00',
+        allowedTokenMints:'', blockedTokenMints:'',
+        whitelistedURLs:'localhost:9090', blacklistedURLs:'',
+        whitelistedAddresses:'', blacklistedAddresses:'',
+        whitelistedProgramIDs:'', blacklistedProgramIDs:'',
+        keywordBlocklist:'', forbiddenActions:'', priorityInstructions:''
+      });
+      const [saving, setSaving] = useState(false);
+      const [saved, setSaved]   = useState(false);
+
+      useEffect(() => {
+        if (!config || formDirty) return;
+        setF({
+          dailyBudget:          String(config.dailyBudgetUSDC          || 2),
+          weeklyBudget:         String(config.weeklyBudgetUSDC         || 10),
+          monthlyBudget:        String(config.monthlyBudgetUSDC        || 50),
+          perTxLimit:           String(config.perTransactionLimitUSDC  || 0.5),
+          autoApproveThreshold: String(config.autoApproveThresholdUSDC || 1),
+          allowedTokenMints:    arrStr(config.allowedTokenMints),
+          blockedTokenMints:    arrStr(config.blockedTokenMints),
+          whitelistedURLs:      arrStr(config.whitelistedURLs),
+          blacklistedURLs:      arrStr(config.blacklistedURLs),
+          whitelistedAddresses: arrStr(config.whitelistedAddresses),
+          blacklistedAddresses: arrStr(config.blacklistedAddresses),
+          whitelistedProgramIDs:arrStr(config.whitelistedProgramIDs),
+          blacklistedProgramIDs:arrStr(config.blacklistedProgramIDs),
+          keywordBlocklist:     arrStr(config.keywordBlocklist),
+          forbiddenActions:     arrStr(config.forbiddenActions),
+          priorityInstructions: config.priorityInstructions || ''
+        });
+      }, [config, formDirty]);
+
+      const bind = k => e => {
+        setFormDirty(true);
+        setF(p => ({...p, [k]: e.target.value}));
+      };
+
+      const save = async () => {
+        setSaving(true);
+        await onSave({
+          dailyBudget:          parseFloat(f.dailyBudget)          || 2,
+          weeklyBudget:         parseFloat(f.weeklyBudget)         || 10,
+          monthlyBudget:        parseFloat(f.monthlyBudget)        || 50,
+          perTxLimit:           parseFloat(f.perTxLimit)           || 0.5,
+          autoApproveThreshold: parseFloat(f.autoApproveThreshold) || 1,
+          allowedTokenMints:    toArr(f.allowedTokenMints),
+          blockedTokenMints:    toArr(f.blockedTokenMints),
+          whitelistedURLs:      toArr(f.whitelistedURLs),
+          blacklistedURLs:      toArr(f.blacklistedURLs),
+          whitelistedAddresses: toArr(f.whitelistedAddresses),
+          blacklistedAddresses: toArr(f.blacklistedAddresses),
+          whitelistedProgramIDs:toArr(f.whitelistedProgramIDs),
+          blacklistedProgramIDs:toArr(f.blacklistedProgramIDs),
+          keywordBlocklist:     toArr(f.keywordBlocklist),
+          forbiddenActions:     toArr(f.forbiddenActions),
+          priorityInstructions: f.priorityInstructions
+        });
+        setFormDirty(false);
+        setSaving(false); setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      };
+
+      const I = (key, type='text', placeholder='') => (
+        <input className="form-input" type={type} step={type==='number'?'0.01':undefined}
+          value={f[key]} onChange={bind(key)} placeholder={placeholder} autoComplete="off"/>
+      );
+      const T = (key, placeholder='') => (
+        <textarea className="form-textarea" value={f[key]} onChange={bind(key)} placeholder={placeholder} autoComplete="off" spellCheck="false"/>
+      );
+
+      const runProbe = async () => {
+        setProbeMsg(null);
+        if (!stackStatus || !stackStatus.proxyRunning) {
+          setProbeMsg('Start the local stack first.');
+          return;
+        }
+        const host = stackStatus.host || '127.0.0.1';
+        const pp = stackStatus.proxyPort;
+        try {
+          const r = await fetch('http://' + host + ':' + pp + '/', {
+            headers: { 'x-aegis-target': 'http://example.com/' }
+          });
+          setProbeMsg('Probe example.com (not whitelisted): HTTP ' + r.status + ' — expect 403');
+        } catch (e) {
+          setProbeMsg(String(e.message || e));
+        }
+      };
+
+      return (
+        <div className="policy-page">
+          <div className="policy-page__surface">
+            <div className="policy-page__head">
+              <span className="sec-title" style={{marginBottom:0}}>Policy rules</span>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? <span className="spinner"/> : saved ? '✓ Saved' : 'Save policy'}
+              </button>
+            </div>
+            <p className="policy-page__lead">
+              Saves to <span className="mono">config.json</span>, syncs enforcement to <span className="mono">~/.aegis/proxy-policy.json</span>. Restart the <strong>local stack</strong> on Overview so the proxy reloads policy from disk.
+            </p>
+
+            <section className="policy-section">
+              <h2 className="policy-h2">Proxy enforcement</h2>
+              <p className="policy-note">
+                Applied to each request while the stack runs: URL allow/deny, hostname keywords, x402 spend caps, and optional <span className="mono">payTo</span> filters.
+              </p>
+
+              {proxyPolicy && proxyPolicy.exists === false && (
+                <div className="policy-missing">
+                  Save once to create <span className="mono">~/.aegis/proxy-policy.json</span>.
+                </div>
+              )}
+
+              {proxyPolicy && proxyPolicy.exists && (
+                <div className="policy-readout">
+                  <div className="policy-readout__caption">Effective policy on disk</div>
+                  <p className="policy-note" style={{marginBottom:'10px'}}>
+                    On HTTP 402 the proxy signs and retries with <span className="mono">PAYMENT-SIGNATURE</span>.
+                  </p>
+                  <div className="policy-readout__path">{proxyPolicy.path}</div>
+                  <table className="policy-kv-table">
+                    <tbody>
+                      <tr><th>URL whitelist</th><td>{(proxyPolicy.whitelist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>URL blacklist</th><td>{(proxyPolicy.blacklist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>Hostname keywords</th><td>{(proxyPolicy.keyword_blocklist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>payTo allowlist</th><td>{(proxyPolicy.recipient_allowlist || []).join(', ') || '—'} <span style={{color:'var(--dim)'}}>(empty = any)</span></td></tr>
+                      <tr><th>payTo denylist</th><td>{(proxyPolicy.recipient_denylist || []).join(', ') || '—'}</td></tr>
+                      <tr><th>Daily cap (µUSDC)</th><td>{String(proxyPolicy.daily_budget_micro_usdc || '')}</td></tr>
+                    </tbody>
+                  </table>
+                  <div className="policy-readout__actions">
+                    <button type="button" className="btn btn-outline" onClick={runProbe}>Probe non-whitelisted host</button>
+                    {probeMsg ? <span style={{fontSize:'12px', color:'var(--muted)'}}>{probeMsg}</span> : null}
+                  </div>
+                </div>
+              )}
+
+              <h3 className="policy-h3">x402 spend caps (proxy)</h3>
+              <p className="form-hint" style={{marginBottom:'14px'}}>Micro-USDC units, consistent with on-chain amounts. Per-tx enforced before signing; daily cap after settlement.</p>
+              <div className="grid-2">
+                <div className="form-group"><label className="form-label">Daily budget (USDC)</label>{I('dailyBudget','number')}</div>
+                <div className="form-group"><label className="form-label">Per-transaction limit (USDC)</label>{I('perTxLimit','number')}</div>
+              </div>
+
+              <h3 className="policy-h3">URL firewall</h3>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Whitelisted URLs</label>
+                  {T('whitelistedURLs','localhost:9090\napi.trusted.com')}
+                  <p className="form-hint">One host per line. Loopback variants added when either <span className="mono">localhost</span> or <span className="mono">127.0.0.1</span> appears.</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Blacklisted URLs</label>
+                  {T('blacklistedURLs','casino.com\ndrain.io')}
+                  <p className="form-hint">Hostname match → HTTP 403 before forward.</p>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">Hostname keyword blocklist</h3>
+              <div className="form-group">
+                <label className="form-label">Keywords</label>
+                {T('keywordBlocklist','drain\ncasino\nmeme')}
+                <p className="form-hint">Substring match on <strong>hostname</strong> only (not paths — <span className="mono">/health</span> unaffected).</p>
+              </div>
+
+              <h3 className="policy-h3">Solana payTo allow / deny</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>
+                Evaluated on x402 <span className="mono">payTo</span> in the 402 body. Empty allowlist permits any recipient not on the denylist.
+              </p>
+              <div className="grid-2">
+                <div className="form-group"><label className="form-label">Allowlisted addresses</label>{T('whitelistedAddresses','Solana base58...')}</div>
+                <div className="form-group"><label className="form-label">Denylisted addresses</label>{T('blacklistedAddresses','Never pay this base58...')}</div>
+              </div>
+            </section>
+
+            <section className="policy-section">
+              <h2 className="policy-h2">App &amp; dashboard</h2>
+              <p className="policy-note">
+                Stored in <span className="mono">~/.aegis/config.json</span> for this app, HITL queues, and agents. Weekly/monthly totals feed Overview; they are not enforced in the proxy binary.
+              </p>
+
+              <h3 className="policy-h3">Dashboard budgets &amp; HITL</h3>
+              <div className="policy-budget-strip">
+                <div className="policy-budget-cell">
+                  <div className="form-group"><label className="form-label">Weekly budget (USDC)</label>{I('weeklyBudget','number')}</div>
+                </div>
+                <div className="policy-budget-cell">
+                  <div className="form-group"><label className="form-label">Monthly budget (USDC)</label>{I('monthlyBudget','number')}</div>
+                </div>
+                <div className="policy-budget-cell">
+                  <div className="form-group">
+                    <label className="form-label">Auto-approve below (USDC)</label>
+                    {I('autoApproveThreshold','number')}
+                    <p className="form-hint">Reserved for automation; approvals remain manual in this build.</p>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">On-chain program IDs</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>For downstream agent checks — not parsed by the HTTP proxy.</p>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Whitelisted program IDs</label>{T('whitelistedProgramIDs','ProgramID...')}</div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group">
+                    <label className="form-label">Blacklisted program IDs</label>
+                    {T('blacklistedProgramIDs','BadProgramID...')}
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">Token mints</h3>
+              <p className="form-hint" style={{marginBottom:'12px'}}>Stored for future settlement hooks.</p>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Allowed token mints</label>{T('allowedTokenMints','Leave empty to allow all')}</div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Blocked token mints</label>{T('blockedTokenMints','MintAddress...')}</div>
+                </div>
+              </div>
+
+              <h3 className="policy-h3">Agent prompts</h3>
+              <div className="policy-pair-panel">
+                <div className="policy-field-slab">
+                  <div className="form-group"><label className="form-label">Forbidden actions</label>{T('forbiddenActions','swap on unapproved DEX')}
+                    <p className="form-hint">Injected into agent policy packs.</p>
+                  </div>
+                </div>
+                <div className="policy-field-slab">
+                  <div className="form-group">
+                    <label className="form-label">Priority instructions</label>
+                    {T('priorityInstructions','Only use approved DEXes.')}
+                    <p className="form-hint">High-level guardrails for tooling.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      );
+    };
+
+    // ── WALLET TAB ────────────────────────────────────────────────────────────
+    const WalletTab = ({ walletStatus, onProvision }) => {
+      const [prov, setProv]           = useState(false);
+      const [result, setResult]       = useState(null);
+      const [solBal, setSolBal]       = useState(null);
+      const [airdropping, setAirdrop] = useState(false);
+      const [airdropMsg, setAirdropMsg] = useState(null);
+
+      useEffect(() => {
+        if (walletStatus && walletStatus.provisioned) {
+          ipc.invoke('get-sol-balance').then(r => r && setSolBal(r.balance));
+          const t = setInterval(() => {
+            ipc.invoke('get-sol-balance').then(r => r && setSolBal(r.balance));
+          }, 5000);
+          return () => clearInterval(t);
+        }
+      }, [walletStatus && walletStatus.provisioned]);
+
+      const doAirdrop = async () => {
+        setAirdrop(true); setAirdropMsg(null);
+        try {
+          const r = await ipc.invoke('airdrop-sol');
+          setAirdropMsg({ ok: true, text: '1 SOL airdropped to your wallet.' });
+          ipc.invoke('get-sol-balance').then(r => r && setSolBal(r.balance));
+        } catch(e) {
+          setAirdropMsg({ ok: false, text: e.message || 'Airdrop failed — try again.' });
+        }
+        setAirdrop(false);
+      };
+
+      const openFaucet = () => {
+        require('electron').shell.openExternal('https://spl-token-faucet.com/?token-name=USDC-Dev');
+      };
+      const [p, setP] = useState({
+        dailyBudget:'2.00', weeklyBudget:'10.00', monthlyBudget:'50.00',
+        perTxLimit:'0.50', autoApproveThreshold:'1.00', whitelistedURLs:'localhost:9090'
+      });
+      const set = k => e => setP(x => ({...x, [k]: e.target.value}));
+
+      const provision = async () => {
+        setProv(true); setResult(null);
+        try {
+          const r = await onProvision({
+            dailyBudget:          parseFloat(p.dailyBudget),
+            weeklyBudget:         parseFloat(p.weeklyBudget),
+            monthlyBudget:        parseFloat(p.monthlyBudget),
+            perTxLimit:           parseFloat(p.perTxLimit),
+            autoApproveThreshold: parseFloat(p.autoApproveThreshold),
+            whitelistedURLs: p.whitelistedURLs.split('\n').map(s=>s.trim()).filter(Boolean)
+          });
+          setResult(r);
+        } catch(e) { setResult({error: e.message}); }
+        setProv(false);
+      };
+
+      const exportRecovery = async () => {
+        const r = await ipc.invoke('export-recovery');
+        if (r) alert(`Share 3 (Recovery)\n\nSave this offline — needed if OS keychain and encrypted file are both lost:\n\n${r.share3}`);
+      };
+
+      if (walletStatus && walletStatus.provisioned) {
+        return (
+          <div>
+            <div className="card">
+              <div className="sec-hdr">
+                <span className="sec-title">Wallet Status</span>
+                <span className="pill pill-active">Active</span>
+              </div>
+              <div className="ks-row">
+                <span className="ks-label">Public Key</span>
+                <span className="ks-val">
+                  <span className="mono" style={{fontSize:'11px'}}>{walletStatus.publicKey}</span>
+                  <CopyButton value={walletStatus.publicKey}/>
+                </span>
+              </div>
+              <div className="ks-row">
+                <span className="ks-label">Share 1</span>
+                <span className="ks-val" style={{color:'var(--signal-ok)'}}>● OS Credential Manager (keytar)</span>
+              </div>
+              <div className="ks-row">
+                <span className="ks-label">Share 2</span>
+                <span className="ks-val" style={{color:'var(--signal-ok)'}}>● AES-256 Encrypted File (~/.aegis/share2.enc)</span>
+              </div>
+              <div className="ks-row">
+                <span className="ks-label">Share 3</span>
+                <span className="ks-val" style={{color: walletStatus.recoveryExists ? '#a08262' : 'var(--dim)'}}>
+                  {walletStatus.recoveryExists ? '● Offline Recovery Export' : '○ Not exported'}
+                </span>
+              </div>
+              <div className="ks-row">
+                <span className="ks-label">Threshold</span>
+                <span className="ks-val">2-of-3 shares required to reconstruct</span>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="sec-hdr">
+                <span className="sec-title">Devnet Funds</span>
+                {solBal !== null && (
+                  <span style={{fontSize:'12px', fontFamily:'monospace', color:'var(--muted)'}}>
+                    Balance: <span style={{color:'var(--text)'}}>{solBal.toFixed(4)} SOL</span>
+                  </span>
+                )}
+              </div>
+              <p style={{fontSize:'13px', color:'var(--muted)', marginBottom:'16px', lineHeight:'1.6'}}>
+                Your wallet needs SOL to pay Solana transaction fees, and Devnet USDC to make payments.
+              </p>
+              {airdropMsg && (
+                <div className={airdropMsg.ok ? 'toast-ok' : 'toast-err'} style={{marginBottom:'12px'}}>
+                  {airdropMsg.ok ? '✓ ' : '✗ '}{airdropMsg.text}
+                </div>
+              )}
+              <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
+                <button className="btn btn-primary" onClick={doAirdrop} disabled={airdropping}>
+                  {airdropping ? <span><span className="spinner"/> Airdropping…</span> : 'Airdrop 1 SOL (Devnet)'}
+                </button>
+                <button className="btn btn-outline" onClick={openFaucet}>
+                  Get Devnet USDC ↗
+                </button>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="sec-hdr"><span className="sec-title">Recovery</span></div>
+              <p style={{fontSize:'13px', color:'var(--muted)', marginBottom:'16px', lineHeight:'1.6'}}>
+                Share 3 is your offline recovery key. Store it somewhere safe and separate from this machine.
+                You need any 2 of 3 shares to reconstruct the private key.
+              </p>
+              <button className="btn btn-outline" onClick={exportRecovery}>Export Recovery Share</button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="card">
+          <div className="sec-hdr"><span className="sec-title">Provision Agent Wallet</span></div>
+          <p style={{fontSize:'13px', color:'var(--muted)', marginBottom:'20px', lineHeight:'1.6'}}>
+            Generate a new Solana keypair and distribute the signing key across two secure backends
+            using Shamir's Secret Sharing (2-of-3). Configure initial policy rules below.
+          </p>
+
+          <div className="grid-3">
+            <div className="form-group"><label className="form-label">Daily Budget (USDC)</label>
+              <input className="form-input" type="number" step="0.01" value={p.dailyBudget} onChange={set('dailyBudget')}/></div>
+            <div className="form-group"><label className="form-label">Weekly Budget (USDC)</label>
+              <input className="form-input" type="number" step="0.01" value={p.weeklyBudget} onChange={set('weeklyBudget')}/></div>
+            <div className="form-group"><label className="form-label">Monthly Budget (USDC)</label>
+              <input className="form-input" type="number" step="0.01" value={p.monthlyBudget} onChange={set('monthlyBudget')}/></div>
+          </div>
+          <div className="grid-2">
+            <div className="form-group"><label className="form-label">Per-Transaction Limit (USDC)</label>
+              <input className="form-input" type="number" step="0.01" value={p.perTxLimit} onChange={set('perTxLimit')}/></div>
+            <div className="form-group">
+              <label className="form-label">Auto-Approve Below (USDC)</label>
+              <input className="form-input" type="number" step="0.01" value={p.autoApproveThreshold} onChange={set('autoApproveThreshold')}/>
+              <p className="form-hint">Transactions above this pause and require your approval.</p>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Whitelisted URLs (one per line)</label>
+            <textarea className="form-textarea" value={p.whitelistedURLs} onChange={set('whitelistedURLs')} placeholder="localhost:9090"/>
+          </div>
+
+          {result && result.error   && <div className="toast-err">✗ {result.error}</div>}
+          {result && result.publicKey && <div className="toast-ok">✓ Wallet provisioned — {result.publicKey}</div>}
+
+          <button className="btn btn-primary" onClick={provision} disabled={prov}>
+            {prov ? <span><span className="spinner"/> Provisioning…</span> : 'Provision Agent Wallet'}
+          </button>
+        </div>
+      );
+    };
+
+    // ── APP ROOT ──────────────────────────────────────────────────────────────
+    function App() {
+      const [tab, setTab]               = useState('overview');
+      const [walletStatus, setWS]       = useState(null);
+      const [config, setConfig]         = useState(null);
+      const [stats, setStats]           = useState(null);
+      const [activity, setActivity]     = useState([]);
+      const [pending, setPending]       = useState([]);
+      const [proxyPolicy, setProxyPolicy] = useState(null);
+      const [proxyActivity, setProxyActivity] = useState([]);
+      const [proxyOverview, setProxyOverview] = useState(null);
+      const [stackPorts, setStackPorts] = useState(() => {
+        try {
+          const s = localStorage.getItem('aegis-stack-ports');
+          if (s) return { ...defaultStackPorts, ...JSON.parse(s) };
+        } catch (_) {}
+        return defaultStackPorts;
+      });
+      const [stackStatus, setStackStatus] = useState(null);
+      const [stackLogs, setStackLogs]   = useState([]);
+      const [healthPremium, setHealthPremium] = useState(null);
+      const [healthProxy, setHealthProxy] = useState(null);
+      const [scriptOut, setScriptOut]   = useState('');
+      const [scriptBusy, setScriptBusy] = useState(false);
+      const [proofJson, setProofJson]   = useState(null);
+      const scriptPollRef = useRef(null);
+
+      useEffect(() => {
+        try { localStorage.setItem('aegis-stack-ports', JSON.stringify(stackPorts)); } catch (_) {}
+      }, [stackPorts]);
+
+      useEffect(() => {
+        const t = setInterval(async () => {
+          try {
+            const st = await ipc.invoke('aegis-stack-status');
+            setStackStatus(st);
+            const logs = await ipc.invoke('aegis-stack-logs');
+            setStackLogs(logs || []);
+          } catch (_) {}
+        }, 1500);
+        return () => clearInterval(t);
+      }, []);
+
+      useEffect(() => {
+        if (!stackStatus || !stackStatus.proxyRunning) {
+          setHealthPremium(null);
+          setHealthProxy(null);
+          return;
+        }
+        const host = stackStatus.host || '127.0.0.1';
+        const pp = stackStatus.premiumPort;
+        const pr = stackStatus.proxyPort;
+        const poll = async () => {
+          try {
+            const r = await fetch(`http://${host}:${pp}/health`);
+            setHealthPremium(r.ok ? await r.json() : null);
+          } catch (_) { setHealthPremium(null); }
+          try {
+            const r = await fetch(`http://${host}:${pr}/health`);
+            setHealthProxy(r.ok ? await r.json() : null);
+          } catch (_) { setHealthProxy(null); }
+        };
+        poll();
+        const iv = setInterval(poll, 2000);
+        return () => clearInterval(iv);
+      }, [stackStatus && stackStatus.proxyRunning, stackStatus && stackStatus.premiumPort, stackStatus && stackStatus.proxyPort, stackStatus && stackStatus.host]);
+
+      const handleStackStart = async () => {
+        await ipc.invoke('aegis-stack-clear-logs');
+        const r = await ipc.invoke('aegis-stack-start', { proxyPort: stackPorts.proxy, premiumPort: stackPorts.premium });
+        if (!r.ok) alert(r.error || 'Could not start stack');
+      };
+      const handleStackStop = async () => { await ipc.invoke('aegis-stack-stop'); };
+      const handleClearStackLogs = async () => { await ipc.invoke('aegis-stack-clear-logs'); };
+
+      const runSmoke = async () => {
+        if (scriptPollRef.current) { clearInterval(scriptPollRef.current); scriptPollRef.current = null; }
+        setScriptBusy(true);
+        setScriptOut('');
+        setProofJson(null);
+        const r = await ipc.invoke('aegis-script-start-smoke');
+        if (!r.ok) { alert(r.error || 'Could not start smoke test'); setScriptBusy(false); return; }
+        scriptPollRef.current = setInterval(async () => {
+          const st = await ipc.invoke('aegis-script-status');
+          setScriptOut(st.output || '');
+          if (!st.running && st.lastCode !== null && st.lastCode !== undefined) {
+            clearInterval(scriptPollRef.current);
+            scriptPollRef.current = null;
+            setScriptBusy(false);
+          }
+        }, 150);
+      };
+
+      const runProof = async () => {
+        if (scriptPollRef.current) { clearInterval(scriptPollRef.current); scriptPollRef.current = null; }
+        setScriptBusy(true);
+        setScriptOut('');
+        setProofJson(null);
+        const r = await ipc.invoke('aegis-script-start-proof');
+        if (!r.ok) { alert(r.error || 'Could not start proof'); setScriptBusy(false); return; }
+        scriptPollRef.current = setInterval(async () => {
+          const st = await ipc.invoke('aegis-script-status');
+          setScriptOut(st.output || '');
+          if (!st.running && st.lastCode !== null && st.lastCode !== undefined) {
+            clearInterval(scriptPollRef.current);
+            scriptPollRef.current = null;
+            setScriptBusy(false);
+            if (st.lastCode === 0) {
+              const pj = await ipc.invoke('aegis-read-proof');
+              setProofJson(pj);
+            }
+          }
+        }, 150);
+      };
+
+      const localStackEl = (
+        <LocalStackCard
+          stackPorts={stackPorts}
+          setStackPorts={setStackPorts}
+          stackStatus={stackStatus}
+          stackLogs={stackLogs}
+          healthPremium={healthPremium}
+          healthProxy={healthProxy}
+          scriptOut={scriptOut}
+          scriptBusy={scriptBusy}
+          proofJson={proofJson}
+          onStart={handleStackStart}
+          onStop={handleStackStop}
+          onClearLogs={handleClearStackLogs}
+          onRunSmoke={runSmoke}
+          onRunProof={runProof}
+        />
+      );
+
+      const refresh = useCallback(async () => {
+        try {
+          const [ws, cfg, sp, act, pnd] = await Promise.all([
+            ipc.invoke('get-wallet-status'),
+            ipc.invoke('get-config'),
+            ipc.invoke('get-spend-stats'),
+            ipc.invoke('get-activity'),
+            ipc.invoke('get-pending')
+          ]);
+          if (ws)  setWS(ws);
+          if (cfg) setConfig(cfg);
+          if (sp)  setStats(sp);
+          setActivity(act || []);
+          setPending(pnd || []);
+        } catch(e) { console.error('Refresh:', e); }
+        try {
+          const pp = await ipc.invoke('get-proxy-policy');
+          setProxyPolicy(pp);
+        } catch (e) { console.error('get-proxy-policy:', e); }
+        try {
+          const pa = await ipc.invoke('get-proxy-activity', 150);
+          setProxyActivity((pa && pa.events) ? pa.events : []);
+        } catch (e) { console.error('get-proxy-activity:', e); }
+        try {
+          const po = await ipc.invoke('get-proxy-overview-stats');
+          setProxyOverview(po);
+        } catch (e) { console.error('get-proxy-overview-stats:', e); }
+      }, []);
+
+      useEffect(() => { refresh(); const t = setInterval(refresh, 2000); return () => clearInterval(t); }, [refresh]);
+
+      const handleProvision  = async (policy) => { const r = await ipc.invoke('provision-wallet', policy); await refresh(); return r; };
+      const handleSavePolicy = async (policy) => { await ipc.invoke('save-policy', policy); await refresh(); };
+      const handleApprove    = async (id)     => { await ipc.invoke('approve-transaction', id); await refresh(); };
+      const handleDeny       = async (id)     => { await ipc.invoke('deny-transaction', id);    await refresh(); };
+
+      const shortKey = walletStatus && walletStatus.publicKey
+        ? walletStatus.publicKey.slice(0,6) + '…' + walletStatus.publicKey.slice(-4)
+        : 'No wallet';
+
+      const tabs = [
+        { id:'overview', label:'Overview',  Icon: IconOverview,  group:'Monitor' },
+        { id:'activity', label:'Activity',  Icon: IconActivity,  group:'Monitor',  badge: pending.length || null },
+        { id:'policy',   label:'Policy',    Icon: IconPolicy,    group:'Configure' },
+        { id:'wallet',   label:'Wallet',    Icon: IconWallet,    group:'Configure' },
+      ];
+
+      return (
+        <div style={{display:'flex', flex:1, width:'100%', minHeight:0, overflow:'hidden'}}>
+
+          {/* SIDEBAR */}
+          <div className="sidebar">
+            <div className="sidebar-logo">
+              <div className="sidebar-logo-text">AEGIS</div>
+              <div className="sidebar-logo-sub">Secure gateway</div>
+            </div>
+
+            {['Monitor','Configure'].map(group => (
+              <div key={group}>
+                <div className="nav-section-label">{group}</div>
+                {tabs.filter(t => t.group === group).map(({ id, label, Icon, badge }) => (
+                  <div key={id} className={`nav-item ${tab===id?'active':''}`} onClick={() => setTab(id)}>
+                    <Icon/>
+                    <span>{label}</span>
+                    {badge && <span className="nav-badge">{badge}</span>}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <div className="agent-status-block">
+              <div className="status-row">
+                <div className={`status-dot ${walletStatus && walletStatus.provisioned ? '' : 'offline'}`}/>
+                <span>{walletStatus && walletStatus.provisioned ? 'Agent Active' : 'Not Provisioned'}</span>
+              </div>
+              <div className="status-key">{shortKey}</div>
+            </div>
+          </div>
+
+          {/* MAIN */}
+          <div className="main">
+            <div className="topbar">
+              <span className="topbar-title">
+                {tab==='overview' ? 'Overview' : tab==='activity' ? 'Transaction activity' : tab==='policy' ? 'Policy & enforcement' : 'Wallet & keys'}
+              </span>
+              <div className="topbar-actions">
+                <button type="button" className="btn btn-outline" style={{fontSize:'12px', padding:'6px 12px'}}
+                  onClick={() => ipc.invoke('open-agent-demo-window')}>
+                  Agent demo chat
+                </button>
+                <span className={'topbar-pubkey' + (walletStatus && walletStatus.publicKey ? '' : ' topbar-pubkey--empty')}>
+                  {walletStatus && walletStatus.publicKey
+                    ? `${walletStatus.publicKey.slice(0,6)}…${walletStatus.publicKey.slice(-4)}`
+                    : ''}
+                </span>
+                <span className={`topbar-status ${pending.length ? 'topbar-warn' : ''}`}>
+                  {pending.length > 0
+                    ? `⚠ ${pending.length} pending approval${pending.length>1?'s':''}`
+                    : 'All systems normal'}
+                </span>
+              </div>
+            </div>
+
+            <div className="content">
+              {tab==='overview' && (
+                <OverviewTab
+                  stats={stats}
+                  walletStatus={walletStatus}
+                  pendingCount={pending.length}
+                  localStack={localStackEl}
+                  proxyOverview={proxyOverview}
+                />
+              )}
+              {tab==='activity' && <ActivityTab activity={activity} pending={pending} proxyActivity={proxyActivity} onApprove={handleApprove} onDeny={handleDeny}/>}
+              {tab==='policy'   && <PolicyTab   config={config}   onSave={handleSavePolicy} proxyPolicy={proxyPolicy} stackStatus={stackStatus}/>}
+              {tab==='wallet'   && <WalletTab   walletStatus={walletStatus} onProvision={handleProvision}/>}
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>

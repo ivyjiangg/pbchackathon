@@ -4,7 +4,30 @@
   "workspaces": [
     "packages/*"
   ],
+  "main": "main.js",
   "scripts": {
-    "start:aegis": "npm run start -w aegis-proxy"
+    "start": "electron .",
+    "start:aegis": "npm run start -w aegis-proxy",
+    "start:premium-api": "npm run start -w aegis-premium-api",
+    "demo:stack": "echo 'Terminal 1: npm run start:aegis  Terminal 2: export AEGIS_PRIVATE_KEY_BASE58=... && npm run start:premium-api  Terminal 3: curl -x http://127.0.0.1:8080 http://127.0.0.1:9090/v1/macro/premium-report'",
+    "test": "node scripts/smoke-test.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "proof:devnet": "node scripts/strict-devnet-proof.mjs",
+    "demo:agent-flow": "node scripts/demo-agent-flow.mjs"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "babel-standalone": "^6.26.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^16.6.1",
+    "electron": "^41.0.3",
+    "keytar": "^7.9.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "secrets.js-grempe": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.8.1"
   }
 }

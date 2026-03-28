@@ -2,7 +2,8 @@ import express from "express";
 import axios from "axios";
 import fs from "fs/promises";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { homedir } from "os";
+import { dirname, join, isAbsolute } from "path";
 import { Keypair } from "@solana/web3.js";
 import { createKeyPairSignerFromBytes } from "@solana/kit";
 import { x402Client } from "@x402/core/client";
@@ -11,9 +12,50 @@ import { ExactSvmScheme, toClientSvmSigner } from "@x402/svm";
 import bs58 from "bs58";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(__dirname, "config.json");
-const PORT = 8080;
-const HOST = "127.0.0.1";
+
+function resolveConfigPath() {
+  const raw = process.env.AEGIS_PROXY_CONFIG_PATH?.trim();
+  if (raw) {
+    if (raw.startsWith("~/")) {
+      return join(homedir(), raw.slice(2));
+    }
+    return isAbsolute(raw) ? raw : join(__dirname, raw);
+  }
+  return join(__dirname, "config.json");
+}
+
+const CONFIG_PATH = resolveConfigPath();
+const PROXY_ACTIVITY_JSONL = join(homedir(), ".aegis", "proxy-activity.jsonl");
+const PORT = (() => {
+  const envPort = process.env.AEGIS_PROXY_PORT ?? process.env.PORT ?? "";
+  const n = Number.parseInt(envPort, 10);
+  return Number.isFinite(n) && n > 0 ? n : 8080;
+})();
+const HOST = process.env.AEGIS_PROXY_HOST || process.env.HOST || "127.0.0.1";
+
+const DEFAULT_RPC_BY_NETWORK = {
+  devnet: "https://api.devnet.solana.com",
+  testnet: "https://api.testnet.solana.com",
+  mainnet: "https://api.mainnet-beta.solana.com",
+  "mainnet-beta": "https://api.mainnet-beta.solana.com",
+};
+
+/**
+ * RPC used by @x402/svm ExactSvmScheme. AEGIS_SOLANA_RPC_URL overrides.
+ * AEGIS_SOLANA_NETWORK defaults to devnet when unset (local dev).
+ */
+function resolveSvmRpcUrl() {
+  const custom = process.env.AEGIS_SOLANA_RPC_URL?.trim();
+  if (custom) return custom;
+  const net = (process.env.AEGIS_SOLANA_NETWORK || "devnet").trim().toLowerCase();
+  const url = DEFAULT_RPC_BY_NETWORK[net];
+  if (!url) {
+    throw new Error(
+      `Unknown AEGIS_SOLANA_NETWORK "${process.env.AEGIS_SOLANA_NETWORK}". Use devnet, mainnet-beta, testnet, or set AEGIS_SOLANA_RPC_URL.`,
+    );
+  }
+  return url;
+}
 
 const HOP_BY_HOP_REQ = new Set([
   "connection",
@@ -68,7 +110,11 @@ async function getX402HttpClient() {
   if (cachedX402HttpClient) return cachedX402HttpClient;
   const kp = await getKey();
   const svmSigner = toClientSvmSigner(await createKeyPairSignerFromBytes(kp.secretKey));
-  const core = new x402Client().register("solana:*", new ExactSvmScheme(svmSigner));
+  const rpcUrl = resolveSvmRpcUrl();
+  const core = new x402Client().register(
+    "solana:*",
+    new ExactSvmScheme(svmSigner, { rpcUrl }),
+  );
   cachedX402HttpClient = new x402HTTPClient(core);
   return cachedX402HttpClient;
 }
@@ -79,6 +125,15 @@ function resolveTargetUrl(req) {
     const s = String(rawHeader).trim();
     try {
       return new URL(s).href;
+    } catch {
+      return null;
+    }
+  }
+  // HTTP proxy clients send absolute-form request-target (e.g. GET http://host/path)
+  const rawUrl = req.url || "";
+  if (/^https?:\/\//i.test(rawUrl)) {
+    try {
+      return new URL(rawUrl).href;
     } catch {
       return null;
     }
@@ -102,6 +157,48 @@ function hostnameMatchesWhitelist(hostname, whitelist) {
   return false;
 }
 
+/**
+ * Keyword blocklist: match on hostname only (not full URL path).
+ * Matching on the full URL caused false positives (e.g. keyword "health" blocking /health).
+ */
+function keywordBlockHit(hostname, keywords) {
+  const h = String(hostname).toLowerCase();
+  for (const raw of keywords || []) {
+    const k = String(raw).toLowerCase().trim();
+    if (k && h.includes(k)) return k;
+  }
+  return null;
+}
+
+/**
+ * URL-layer policy: blacklist, then whitelist, then keyword on hostname.
+ * Returns { ok, reason?, keyword? }.
+ */
+function evaluateUrlPolicy(cfg, hostname) {
+  const bl = cfg.blacklist ?? [];
+  if (hostnameMatchesWhitelist(hostname, bl)) {
+    return { ok: false, reason: "host blacklisted" };
+  }
+  if (!hostnameMatchesWhitelist(hostname, cfg.whitelist ?? [])) {
+    return { ok: false, reason: "domain not whitelisted" };
+  }
+  const hit = keywordBlockHit(hostname, cfg.keyword_blocklist ?? []);
+  if (hit) {
+    return { ok: false, reason: "keyword_blocklist", keyword: hit };
+  }
+  return { ok: true };
+}
+
+async function appendProxyActivity(evt) {
+  const line = JSON.stringify({ ts: new Date().toISOString(), ...evt }) + "\n";
+  try {
+    await fs.mkdir(dirname(PROXY_ACTIVITY_JSONL), { recursive: true });
+    await fs.appendFile(PROXY_ACTIVITY_JSONL, line, "utf8");
+  } catch (e) {
+    console.error("[Aegis Proxy] activity log:", e?.message ?? e);
+  }
+}
+
 function maxAmountFromPaymentRequired(pr) {
   if (!pr.accepts?.length) {
     throw new Error("PaymentRequired has no accepts");
@@ -114,18 +211,59 @@ function maxAmountFromPaymentRequired(pr) {
   return max;
 }
 
+/**
+ * x402 payTo (Solana) allow/deny — synced from Policy "Whitelisted / Blacklisted Addresses".
+ * Empty allowlist = allow any payTo except those on denylist.
+ */
+function evaluateRecipientPolicy(cfg, paymentRequired) {
+  const deny = new Set((cfg.recipient_denylist || []).map((x) => String(x).trim()).filter(Boolean));
+  const allow = (cfg.recipient_allowlist || []).map((x) => String(x).trim()).filter(Boolean);
+  const payTos = [];
+  for (const acc of paymentRequired.accepts || []) {
+    if (acc.payTo != null && String(acc.payTo).length > 0) {
+      payTos.push(String(acc.payTo).trim());
+    }
+  }
+  if (payTos.length === 0) return { ok: true };
+  for (const addr of payTos) {
+    if (deny.has(addr)) {
+      return { ok: false, reason: "payment recipient denied" };
+    }
+  }
+  if (allow.length > 0) {
+    for (const addr of payTos) {
+      if (!allow.includes(addr)) {
+        return { ok: false, reason: "payment recipient not allowlisted" };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 async function checkPolicy(paymentRequired, targetUrl) {
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const config = JSON.parse(raw);
   const hostname = new URL(targetUrl).hostname;
-  if (!hostnameMatchesWhitelist(hostname, config.whitelist ?? [])) {
-    return { ok: false, reason: "domain not whitelisted" };
+  const urlEval = evaluateUrlPolicy(config, hostname);
+  if (!urlEval.ok) {
+    return { ok: false, reason: urlEval.reason, keyword: urlEval.keyword };
+  }
+  const recv = evaluateRecipientPolicy(config, paymentRequired);
+  if (!recv.ok) {
+    return { ok: false, reason: recv.reason };
   }
   const amount = maxAmountFromPaymentRequired(paymentRequired);
+  const perTxCap = config.per_tx_limit_micro_usdc ?? config.per_tx_limit_lamports;
+  if (perTxCap !== undefined && perTxCap !== null && String(perTxCap).length > 0) {
+    const cap = BigInt(String(perTxCap));
+    if (amount > cap) {
+      return { ok: false, reason: "amount exceeds per-transaction limit" };
+    }
+  }
   const today = new Date().toISOString().slice(0, 10);
   const spent =
     config.last_reset_date === today ? BigInt(config.spent_today ?? "0") : BigInt(0);
-  const budget = BigInt(config.daily_budget_lamports);
+  const budget = BigInt(config.daily_budget_lamports ?? "0");
   if (spent + amount > budget) {
     return { ok: false, reason: "amount exceeds daily budget" };
   }
@@ -204,6 +342,10 @@ async function forwardOnce(targetUrl, req) {
 
 const app = express();
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, service: "aegis-proxy" });
+});
+
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
     req.bodyBuffer = Buffer.alloc(0);
@@ -237,13 +379,32 @@ app.use(async (req, res) => {
 
     const raw = await fs.readFile(CONFIG_PATH, "utf8");
     const cfg = JSON.parse(raw);
-    if (!hostnameMatchesWhitelist(hostname, cfg.whitelist ?? [])) {
-      return res.status(403).json({ error: "target host not whitelisted" });
+    const urlEval = evaluateUrlPolicy(cfg, hostname);
+    if (!urlEval.ok) {
+      const reason = urlEval.reason || "policy denied";
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: reason === "host blacklisted" ? "blocked_blacklist" : reason === "keyword_blocklist" ? "blocked_keyword" : "blocked_not_whitelisted",
+        status: 403,
+        detail: urlEval.keyword ? { keyword: urlEval.keyword } : undefined,
+      });
+      return res.status(403).json({
+        error: "policy denied",
+        reason,
+        keyword: urlEval.keyword,
+      });
     }
 
     const first = await forwardOnce(targetUrl, req);
 
     if (first.status !== 402) {
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "forwarded",
+        status: first.status,
+      });
       return sendAxiosResponse(res, first);
     }
 
@@ -270,7 +431,18 @@ app.use(async (req, res) => {
 
     const policy = await checkPolicy(paymentRequired, targetUrl);
     if (!policy.ok) {
-      return res.status(403).json({ error: "policy denied", reason: policy.reason });
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "policy_denied",
+        status: 403,
+        detail: { reason: policy.reason, keyword: policy.keyword },
+      });
+      return res.status(403).json({
+        error: "policy denied",
+        reason: policy.reason,
+        keyword: policy.keyword,
+      });
     }
 
     const paymentPayload = await httpClient.createPaymentPayload(paymentRequired);
@@ -294,15 +466,43 @@ app.use(async (req, res) => {
 
     if (retry.status === 200) {
       await persistSpendAfterSuccess(policy.amountLamports);
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "paid_success",
+        status: 200,
+        amount_micro: policy.amountLamports.toString(),
+      });
+    } else {
+      await appendProxyActivity({
+        hostname,
+        url: targetUrl,
+        outcome: "payment_retry_non_200",
+        status: retry.status,
+      });
     }
 
     return sendAxiosResponse(res, retry);
   } catch (err) {
     console.error("[Aegis Proxy] Error:", err?.message ?? err);
+    await appendProxyActivity({
+      outcome: "error",
+      status: 500,
+      detail: String(err?.message ?? err),
+    });
     return res.status(500).json({ error: "proxy error" });
   }
 });
 
+try {
+  resolveSvmRpcUrl();
+} catch (e) {
+  console.error("[Aegis Proxy] Invalid Solana RPC config:", e?.message ?? e);
+  process.exit(1);
+}
+
 app.listen(PORT, HOST, () => {
   console.log(`[Aegis Proxy] Listening on http://${HOST}:${PORT}`);
+  console.log(`[Aegis Proxy] Solana RPC: ${resolveSvmRpcUrl()}`);
+  console.log(`[Aegis Proxy] Policy file: ${CONFIG_PATH}`);
 });

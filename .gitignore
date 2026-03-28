@@ -1,1 +1,8 @@
 node_modules/
+.cursor/
+.env
+/.env
+.DS_Store
+.aegis/
+dist/
+*.enc
